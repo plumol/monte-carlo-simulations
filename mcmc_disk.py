@@ -208,7 +208,8 @@ class Simulation():
         while tau_chain > 0:
             print("initial velocity", particles[k].v)
             print("tau chain", tau_chain)
-            # initialize all particles to be infinite colliding time away
+
+            # initialize all particles to be infinite colliding time away, stored as (idx, time)
             colliding_times = [(i, float("inf")) for i in range(len(particles))]
             # pairwise collision time collisions
             for idx, particle in enumerate(particles):
@@ -216,6 +217,7 @@ class Simulation():
                 # pass collision time calculation for the same particle
                 if idx == k:
                     continue
+                
                 dx = particle.pos.x - particles[k].pos.x
                 dy = particle.pos.y - particles[k].pos.y
 
@@ -256,6 +258,7 @@ class Simulation():
             colliding_times.append((len(particles) + 1, t_v_wall))
             print("colliding times", colliding_times)
 
+            # check minimum collding time > 0 
             min_colliding_time = min((c_time for c_time in colliding_times if c_time[1] > 0), key=lambda t: t[1])
             print("min_collide", min_colliding_time)
 
@@ -280,13 +283,9 @@ class Simulation():
                     # reset current particle velocity to 0
                     # update particle idx to the new particle
                     # update particle velocity 
-                    print("before transferring", particles[k].v, particles[min_colliding_time[0]].v)
                     particles[k].v[0], particles[k].v[1] = 0, 0
-                    old_k = k
                     k = min_colliding_time[0]
                     particles[k].v[0], particles[k].v[1] = v[0], v[1]
-                    print(old_k, k)
-                    print("after transferring", particles[old_k].v, particles[min_colliding_time[0]].v)
             else:
                 # move to x + v * tau_chain
                 pdx = particles[k].v[0] * tau_chain
