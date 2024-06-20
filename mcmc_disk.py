@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 2
+tick_speed = 1000
 
 m = 250
 
@@ -113,7 +113,7 @@ class Simulation():
         self.rect_value = pygame.Rect(screen.get_width()/4, screen.get_height()/4, 200, 200)
         self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
-        self.populate_spawning(2, 24, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol="uniform")
+        self.populate_spawning(4, 24, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol="random")
         
 
     #print(particle_list)
@@ -217,12 +217,12 @@ class Simulation():
                 # pass collision time calculation for the same particle
                 if idx == k:
                     continue
-                
+
                 dx = particle.pos.x - particles[k].pos.x
                 dy = particle.pos.y - particles[k].pos.y
 
                 a = (particles[k].v[0]**2 + particles[k].v[1]**2)
-                b = 2 * ( -particles[k].v[0] * dx - particles[k].v[1] * dy)
+                b = 2 * -( particles[k].v[0] * dx + particles[k].v[1] * dy)
                 c = dx**2 + dy**2 - (particle.radius + particles[k].radius)**2
 
                 # if discriminant < 0, no real roots and no collisions, default is already set to inf
@@ -258,7 +258,12 @@ class Simulation():
             colliding_times.append((len(particles) + 1, t_v_wall))
             print("colliding times", colliding_times)
 
+            # remove any that are currently colliding:
+            for idx, particle in enumerate(particles):
+                if particles[k].is_collision(particle):
+                    del colliding_times[idx]
             # check minimum collding time > 0 
+            
             min_colliding_time = min((c_time for c_time in colliding_times if c_time[1] > 0), key=lambda t: t[1])
             print("min_collide", min_colliding_time)
 
@@ -267,16 +272,16 @@ class Simulation():
                 pdx = particles[k].v[0] * min_colliding_time[1]
                 pdy = particles[k].v[1] * min_colliding_time[1]
                 particles[k].move(pdx, pdy)
-
-                if not particles[k].check_valid_move():
-                    print("AHhhhhh")
+                #pygame.draw.circle(screen, "black", (particles[k].pos.x + pdx, particles[k].pos.y + pdy), particles[k].radius, 3)
 
                 if min_colliding_time[0] == len(particles):
                     particles[k].v[0] = -particles[k].v[0]
+                    v[0] = -v[0]
                     # pygame.time.delay(2000)
                     
                 elif min_colliding_time[0] == len(particles) + 1:
                     particles[k].v[1] = -particles[k].v[1]
+                    v[1] = -v[1]
                     # pygame.time.delay(2000)
                     
                 else:

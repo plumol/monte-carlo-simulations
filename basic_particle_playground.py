@@ -11,6 +11,7 @@ dt = 0
 player_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 stationary_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 
+
 radius = 40
 v = [100, 100]
 
@@ -19,6 +20,8 @@ def overlap(p1, p2):
     #print(distance)
     if distance < 2 * radius:
         print("overlap")
+        print(distance)
+        
 
 def collision_time(p1, p2):
     dx = p2.x - p1.x
@@ -35,7 +38,7 @@ def collision_time(p1, p2):
     discriminant = b**2 - 4 * a * c
 
     print(a, b, c)
-
+    
     if v[0] > 0:
         t_v_wall = (screen.get_width() - radius - p1.x) / v[0]
     elif v[0] < 0:
@@ -50,11 +53,10 @@ def collision_time(p1, p2):
         t_h_wall = (- p1.y + radius + 1) / v[1]
     else:
         t_h_wall = float('inf')  # No vertical movement
-    print(t_v_wall, t_h_wall)
     
     if discriminant < 0:
         # No real solution means no collision
-        return float('inf')
+        return float('inf'), t_v_wall, t_h_wall
 
     t1 = (-b - np.sqrt(discriminant)) / (2 * a)
     t2 = (-b + np.sqrt(discriminant)) / (2 * a)
@@ -62,14 +64,15 @@ def collision_time(p1, p2):
     
     # We want the smallest positive time
     if t1 > 0 and t2 > 0:
-        return min(t1, t2)
+        return min(t1, t2), t_v_wall, t_h_wall
     elif t1 > 0:
-        return t1
+        return t1, t_v_wall, t_h_wall
     elif t2 > 0:
-        return t2
+        return t2, t_v_wall, t_h_wall
     else:
-        return float('inf')
-
+        return float('inf'), t_v_wall, t_h_wall
+    
+count = 0
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -78,7 +81,7 @@ while running:
     screen.fill("white")
 
     overlap(player_pos, stationary_pos)
-    t_c = collision_time(player_pos, stationary_pos)
+    t_c, t_v_wall, t_h_wall = collision_time(player_pos, stationary_pos)
     print(t_c)
 
     pygame.draw.circle(screen, "red", player_pos, radius)
@@ -92,8 +95,8 @@ while running:
     #print(end_coord)
     pygame.draw.line(screen, "black", player_pos, end_coord)
 
-    player_pos.x = player_pos.x + v[0] * dt
-    player_pos.y = player_pos.y + v[1] * dt
+    #player_pos.x = player_pos.x + v[0] * dt
+    #player_pos.y = player_pos.y + v[1] * dt
 
     if player_pos.x > screen.get_width() - radius:
         player_pos.x = 2 * (screen.get_width() - radius) - player_pos.x
@@ -128,15 +131,38 @@ while running:
             player_pos.x += dx
     if keys[pygame.K_r]:
         v = [np.random.uniform(-100, 100), np.random.uniform(-100, 100)]
-    if keys[pygame.K_t]:
-        if t_c == float("inf"):
-            pass
-        player_pos.x = player_pos.x + v[0]*t_c
-        player_pos.y = player_pos.y + v[1]*t_c
+    
+    if t_c != float("inf"):
+        p_x = player_pos.x + v[0]*t_c
+        p_y = player_pos.y + v[1]*t_c
+        
+        pygame.draw.circle(screen, "red", (p_x, p_y), radius, 3)
+        
+    if t_v_wall < t_h_wall:
+        p_vwx = player_pos.x + v[0]*t_v_wall
+        p_vwy = player_pos.y + v[1]*t_v_wall
+        
+        pygame.draw.circle(screen, "black", (p_vwx, p_vwy), radius, 3)
 
+    else:
+        p_hwx = player_pos.x + v[0]*t_h_wall
+        p_hwy = player_pos.y + v[1]*t_h_wall
+        
+        pygame.draw.circle(screen, "black", (p_hwx, p_hwy), radius, 3)
+    
     # renders the screen
     pygame.display.flip()
+    
+    
+    dt = 17 / 1000
+    clock.tick(10)
+    if count % 100 == 0:
+        if t_c != float('inf'):
+            print("TELEPORTED!!!!!!!!!")
+            player_pos.x += v[0]*t_c * 0.99
+            player_pos.y += v[1]*t_c * 0.99
+            overlap(player_pos, stationary_pos)
 
-    dt = clock.tick(60) / 1000
+    count += 1
 
 pygame.quit()
