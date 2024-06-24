@@ -13,7 +13,7 @@ stationary_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2)
 
 
 radius = 40
-v = [100, 100]
+v = [100, 0]
 
 def overlap(p1, p2):
     distance = np.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
@@ -87,14 +87,14 @@ while running:
     pygame.draw.circle(screen, "red", player_pos, radius)
     pygame.draw.circle(screen, "blue", stationary_pos, radius)
 
+    # tracing trajectory lines
     y_inter = player_pos.y - np.sqrt(v[0]**2 + v[1]**2)
     normalized = np.array(v)/np.sqrt(v[0]**2 + v[1]**2)
     length = 1000
-    
     end_coord = (player_pos.x + normalized[0] * length, player_pos.y + normalized[1] * length)
-    #print(end_coord)
     pygame.draw.line(screen, "black", player_pos, end_coord)
 
+    # continually updating player velocity
     #player_pos.x = player_pos.x + v[0] * dt
     #player_pos.y = player_pos.y + v[1] * dt
 
@@ -155,13 +155,13 @@ while running:
     
     
     dt = 17 / 1000
-    clock.tick(10)
-    if count % 100 == 0:
-        if t_c != float('inf'):
-            print("TELEPORTED!!!!!!!!!")
-            player_pos.x += v[0]*t_c * 0.99
-            player_pos.y += v[1]*t_c * 0.99
-            overlap(player_pos, stationary_pos)
+    clock.tick(60)
+    # if count % 100 == 0:
+    #     if t_c != float('inf'):
+    #         print("TELEPORTED!!!!!!!!!")
+    #         player_pos.x += v[0]*t_c * 0.99
+    #         player_pos.y += v[1]*t_c * 0.99
+    #         overlap(player_pos, stationary_pos)
 
     count += 1
 
