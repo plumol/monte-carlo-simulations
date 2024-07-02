@@ -409,12 +409,13 @@ class Simulation():
             self.sampling_method(particles=self.particle_list)
 
             count += 1
-            if count % 10000 == 0:
-                print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
+            if count % 100000 == 0:
+                # print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
                 toc = time.perf_counter()
                 print(f"Time taken: {toc - tic}")
                 tic = time.perf_counter()
+            if count % 10000 == 0 :
                 self.structure_factor()
 
         print("Finished!")
@@ -433,7 +434,7 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 10_000_00
+N_TRIALS = 100_000_000
 
 # markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
 # m_x_pos, m_y_pos = markov.simulate()
@@ -450,8 +451,8 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # ecmc_ff.save_positions("ecmc_ff_1mil-1D.csv")
 
 # markov.save_structure_factors("markov_sf_10m-3.csv")
-# ecmc.save_structure_factors("ecmc_sf_50m.csv")
-# ecmc_ff.save_structure_factors("ecmc_ff_sf_50m.csv")
+ecmc.save_structure_factors("ecmc_sf_100m-2.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_100m-2.csv")
 
 # load saved CSV files
 # markov_df = pd.read_csv("markov_sampling_1mil-0620.csv")
@@ -470,19 +471,19 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # markov_sf_df = pd.read_csv("markov_sf_10m-3.csv")
 # markov_sf = markov_sf_df["sf"].to_list()
 
-# ecmc_sf_df = pd.read_csv("ecmc_sf_50m.csv")
+# ecmc_sf_df = pd.read_csv("ecmc_sf_100m-1.csv")
 # ecmc_sf = ecmc_sf_df["sf"].to_list()
 
-# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_50m.csv")
+# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_100m-1.csv")
 # ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
 fig = plt.figure()
 # plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
 
-plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
+# plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
-plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
+# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
 
 plt.legend()
 plt.show()
@@ -496,7 +497,7 @@ plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ec
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 50, histtype='step', label="markov", density=True )
 # plt.hist(np.array(ecmc_sf, dtype=complex), 50, histtype='step', label="ecmc", density=True, cumulative=True)
-# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 50, histtype='step', label="ecmc ff", density=True, cumulative=True )
+# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 50, histtype='step', label="ecmc ff", density=True, cumulative=True)
 
 # plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors, dtype=complex), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc_sf))], np.array(ecmc_sf, dtype=complex), label="ecmc")
