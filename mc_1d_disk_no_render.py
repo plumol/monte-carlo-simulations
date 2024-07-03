@@ -23,45 +23,27 @@ class Particle():
         self.total = 0
 
         self.theta = np.random.uniform(0, 2 * np.pi)
-        self.v = [0.0, 0.0]
+        self.v = 0.0
+        self.delta = 50
 
         # this line is supposed to be an initial movement, but it doesn't actually move until you press R
         #self.check_valid_move(self.dx, self.dy)
 
     def move(self, pdx, pdy, reset = False):
-
-        if self.moveset == "normal":
-            self.pos[0] += pdx
-            self.pos[1] += pdy
-        elif self.moveset == "random" or reset:
-            self.pos[0] = pdx
-            self.pos[1] = pdy
-
+        self.pos[0] += pdx
         pass
     
     def is_collision(self, other_particle):
         distance = np.sqrt((self.pos[0] - other_particle.pos[0])**2 + (self.pos[1] - other_particle.pos[1])**2)
-        return distance < self.radius + other_particle.radius and distance > 2 * self.radius + 0.00000001
+        return distance < self.radius + other_particle.radius and distance > 0
             
     def propose_new_move(self):
-        if self.moveset == "normal":
-            self.total += 1
-            self.accepted += 1
-            pdx = np.random.uniform(0, self.radius)
-            pdy = 0
-            if pdx**2 + pdy**2 > (0.33*self.radius)**2:
-                self.accepted -= 1
-                pdx = 0
-                pdy = 0
-        elif self.moveset == "random":
-            self.total += 1
-            self.accepted += 1
-            pdx = np.random.uniform(self.radius, self.bounding_box - self.radius)
-            pdy = np.random.uniform(self.radius, self.bounding_box - self.radius)
-        return pdx, pdy
+        self.total += 1
+        self.accepted += 1
+        pdx = np.random.uniform(0, self.delta)
+        return pdx
 
     def check_valid_move(self):
-        
         if self.pos[0] < 0:
             return (False, 0)
         elif self.pos[0] > self.bounding_box:
@@ -73,7 +55,7 @@ class Particle():
 
 class Simulation():
 
-    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, spawning_protocol="random"):
+    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, exp_var = 1,spawning_protocol="random"):
         """
         Initializes a Monte Carlo simulation of hard disks within a bounding box. 
 
@@ -86,13 +68,12 @@ class Simulation():
         self.x_pos = []
         self.y_pos = []
         self.particle_list = []
-        self.inner_sf = 0
         self.structure_factors = []
-        self.qt = (2*np.pi)/bounding_box_size
         self.dt = 0
         self.running = True
         self.trials = n_trials
         self.sm = sampling_method
+        self.mean = exp_var
 
         if sampling_method == "direct":
             self.sampling_method = self.direct_sampling_sequence
@@ -130,8 +111,8 @@ class Simulation():
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
                     # init_y = screen.get_height()/2
                 elif spawning_protocol == "uniform":
-                    init_x = 0 + (2.05 * radius * current_column) - radius
-                    # init_x = 0 + (bounding_box/n * current_column) - radius
+                    # init_x = 0 + (2.05 * radius * current_column) - radius
+                    init_x = 0 + (bounding_box/n * current_column) - radius
                     # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
                     # init_y = screen.get_height()/2
                 particle = Particle("red", radius, width=width, init_pos=[init_x, 0], moveset=moveset, bounding_box=self.rect_value)
@@ -148,17 +129,13 @@ class Simulation():
                     break
 
     def structure_factor(self):
+        inner_sf = 0.0
         q = (2*np.pi)/self.rect_value
 
-        if self.sm == "md":
-            structure = 1/len(self.particle_list) * np.sum(np.array([np.exp(q*1j * particle.pos.x) for particle in self.particle_list]))**2
-        
-        elif self.sm == "markov":
-            structure = 1/len(self.x_pos) * np.abs(np.sum([np.exp(q*1j * np.array(self.x_pos))]))**2
-            
-        elif self.sm == "event" or self.sm == "event_ff":
-            # structure = 1/len(self.x_pos) * np.abs(np.sum([np.exp(q*1j * np.array(self.x_pos))]))**2
-            structure = 1/len(self.x_pos) * np.abs(self.inner_sf)**2
+        # structure = 1/len(self.x_pos) * np.abs(np.sum([np.exp(q*1j * np.array(self.x_pos))]))**2
+        for particle in self.particle_list:
+            inner_sf += np.exp(q*1j * particle.pos[0])
+        structure = np.abs(inner_sf)**2/len(self.particle_list)
 
         self.structure_factors.append(structure)
 
@@ -172,7 +149,7 @@ class Simulation():
 
     def markov_chain_sequence(self, particles):
         k = np.random.randint(0, len(particles))
-        pdx, pdy = particles[k].propose_new_move()
+        pdx = particles[k].propose_new_move()
         particles[k].move(pdx, 0)
         valid, side = particles[k].check_valid_move()
         if not valid:
@@ -181,11 +158,14 @@ class Simulation():
                 pdx += self.rect_value 
             elif side == 1:
                 particles[k].move(-self.rect_value , 0)
+                print(particles[k].pos[0], particles[k].pos[0] + self.rect_value)
                 pdx += -self.rect_value 
-            #particles[k].accepted -= 1
-            #print("STOP")
+                print(pdx, pdx + self.rect_value)
+            # particles[k].accepted -= 1
+            # particles[k].move(-pdx, 0)
+            # #particles[k].accepted -= 1
+            # #print("STOP")
             
-            #valid = False
         for idx, particle in enumerate(particles):
             if idx == k:
                 continue
@@ -195,6 +175,8 @@ class Simulation():
                 #particle.color = colors[rand]
                 particles[k].accepted -= 1
                 particles[k].move(-pdx, 0)
+                continue
+                #print(particles[k].pos[0], particles[k].pos[0] + pdx)
                 # valid, side = particles[k].check_valid_move()
                 #print(valid)
         
@@ -235,8 +217,8 @@ class Simulation():
 
     def event_chain_sequence(self, particles):
         k = np.random.randint(0, len(particles))
-        v = [1, 0]
-        particles[k].v[0] = v[0]
+        v = 1
+        particles[k].v = v
 
         tau_chain = 10
         while tau_chain > 0:
@@ -259,12 +241,12 @@ class Simulation():
             else:
                 dx = (particle.pos[0] + self.rect_value)  - particles[k].pos[0] - 2 * particles[k].radius
             
-            colliding_times = dx/particles[k].v[0]
+            colliding_times = dx/particles[k].v
 
             colliding_times = min(colliding_times, tau_chain)
             
             # move to collision
-            pdx = particles[k].v[0] * colliding_times
+            pdx = particles[k].v * colliding_times
             particles[k].move(pdx, 0)
 
             # PBC conditions 
@@ -278,9 +260,9 @@ class Simulation():
             # reset current particle velocity to 0
             # update particle idx to the new particle
             # update particle velocity 
-            particles[k].v[0] = 0
+            particles[k].v = 0
             k = next_idx
-            particles[k].v[0] = v[0]
+            particles[k].v = v
             
             tau_chain -= colliding_times
 
@@ -293,27 +275,28 @@ class Simulation():
         
         # reset all velocities to zero and store positions
         for particle in particles:
-            self.inner_sf += np.exp(self.qt*1j * particle.pos[0])
             self.x_pos.append(particle.pos[0])
             #self.y_pos.append(particle.pos[1])
             particle.accepted += 1
             particle.total += 1
-            particle.v[0] = 0
+            particle.v = 0
 
     def event_chain_ff_sequence(self, particles):
         k = np.random.randint(0, len(particles))
-        v = [1, 0]
+        v = 1
         # v = [1, 1]
-        particles[k].v[0] = v[0]
+        particles[k].v = v
 
         tau_chain = 10
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
         while tau_chain > 0:
-            sampled_u = np.random.uniform(0, 1)
-            P_T = np.random.exponential(0.2)
-            x_ff = -np.log(sampled_u)/P_T
+            # sampled_u = np.random.uniform(0, 1)
+            # P_T = np.random.exponential(0.2)
+            # x_ff = -np.log(sampled_u)/P_T
+
+            x_ff = np.random.exponential(self.mean)
 
             next_idx = (k+1)%len(particles)
             prev_idx = (k-1)%len(particles)
@@ -331,10 +314,10 @@ class Simulation():
             else:
                 dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
 
-            colliding_times = dx/particles[k].v[0] 
+            colliding_times = dx/particles[k].v
 
             # TODO: solve for x_ff_t
-            x_ff_t = x_ff/particles[k].v[0]
+            x_ff_t = x_ff/particles[k].v
             #print(x_ff_t, colliding_times)
             
             # choose factor field or regular collision time, and pick lifting particle
@@ -348,7 +331,7 @@ class Simulation():
 
             if colliding_times < tau_chain:
                 # move to collision
-                pdx = particles[k].v[0] * colliding_times
+                pdx = particles[k].v * colliding_times
                 #pdy = particles[k].v[1] * colliding_times
                 particles[k].move(pdx, 0)
                 valid, side = particles[k].check_valid_move()
@@ -361,12 +344,12 @@ class Simulation():
                 # reset current particle velocity to 0
                 # update particle idx to the new particle
                 # update particle velocity 
-                particles[k].v[0] = 0
+                particles[k].v = 0
                 k = lifted_particle
-                particles[k].v[0] = v[0]
+                particles[k].v = v
             else:
                 # move to x + v * tau_chain
-                pdx = particles[k].v[0] * tau_chain
+                pdx = particles[k].v * tau_chain
                 #pdy = particles[k].v[1] * tau_chain
                 particles[k].move(pdx, 0)
                 valid, side = particles[k].check_valid_move()
@@ -388,11 +371,10 @@ class Simulation():
         
         # reset all velocities to zero
         for particle in particles:
-            self.inner_sf += np.exp(self.qt*1j * particle.pos[0])
             self.x_pos.append(particle.pos[0])
             particle.accepted += 1
             particle.total += 1
-            particle.v[0] = 0
+            particle.v = 0
 
     def simulate(self):
         print("Starting simulation.")
@@ -410,12 +392,13 @@ class Simulation():
 
             count += 1
             if count % 100000 == 0:
-                # print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
+                print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
                 toc = time.perf_counter()
                 print(f"Time taken: {toc - tic}")
                 tic = time.perf_counter()
             if count % 10000 == 0 :
+                
                 self.structure_factor()
 
         print("Finished!")
@@ -434,16 +417,16 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 100_000_000
+N_TRIALS = 1_000_000
 
-# markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-# m_x_pos, m_y_pos = markov.simulate()
+markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
+m_x_pos, m_y_pos = markov.simulate()
 
-ecmc = Simulation("event", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-e_x_pos, e_y_pos = ecmc.simulate()
+# ecmc = Simulation("event", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
+# e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+# ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
+# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
@@ -451,8 +434,8 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # ecmc_ff.save_positions("ecmc_ff_1mil-1D.csv")
 
 # markov.save_structure_factors("markov_sf_10m-3.csv")
-ecmc.save_structure_factors("ecmc_sf_100m-2.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_100m-2.csv")
+# ecmc.save_structure_factors("ecmc_sf_10m-newsf-ff.csv")
+# ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-newsf-ff.csv")
 
 # load saved CSV files
 # markov_df = pd.read_csv("markov_sampling_1mil-0620.csv")
@@ -471,15 +454,15 @@ ecmc_ff.save_structure_factors("ecmc_ff_sf_100m-2.csv")
 # markov_sf_df = pd.read_csv("markov_sf_10m-3.csv")
 # markov_sf = markov_sf_df["sf"].to_list()
 
-# ecmc_sf_df = pd.read_csv("ecmc_sf_100m-1.csv")
+# ecmc_sf_df = pd.read_csv("ecmc_sf_10m-newsf-ff.csv")
 # ecmc_sf = ecmc_sf_df["sf"].to_list()
 
-# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_100m-1.csv")
+# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_10m-newsf-ff.csv")
 # ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
 fig = plt.figure()
-# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
+plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
 
 # plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
@@ -490,14 +473,14 @@ plt.show()
 
 # structure factors
 fig = plt.figure()
-# plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
-plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
+# plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
+# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
 
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 50, histtype='step', label="markov", density=True )
-# plt.hist(np.array(ecmc_sf, dtype=complex), 50, histtype='step', label="ecmc", density=True, cumulative=True)
-# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 50, histtype='step', label="ecmc ff", density=True, cumulative=True)
+# plt.hist(np.array(ecmc_sf, dtype=complex), 100, histtype='step', label="ecmc", density=True)
+# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 100, histtype='step', label="ecmc ff", density=True)
 
 # plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors, dtype=complex), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc_sf))], np.array(ecmc_sf, dtype=complex), label="ecmc")

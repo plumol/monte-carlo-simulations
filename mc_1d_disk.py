@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 100
+tick_speed = 10
 
 m = 250
 
@@ -72,15 +72,15 @@ class Particle(pygame.Rect):
         if self.moveset == "normal":
             self.total += 1
             self.accepted += 1
-            pdx = np.random.uniform(0, self.radius)
+            pdx = np.random.uniform(0, 100)
             pdy = np.random.uniform(0, 0)
-            #valid_move = pygame.Rect(0, 0, width=self.radius, height=self.radius)
-            #valid_move.center = self.center
-            #pygame.draw.rect(screen, "red", valid_move, width=3)
-            if pdx**2 + pdy**2 >  (0.3*self.radius)**2:
-                self.accepted -= 1
-                pdx = 0
-                pdy = 0
+            # #valid_move = pygame.Rect(0, 0, width=self.radius, height=self.radius)
+            # #valid_move.center = self.center
+            # #pygame.draw.rect(screen, "red", valid_move, width=3)
+            # if pdx**2 + pdy**2 >  (0.3*self.radius)**2:
+            #     self.accepted -= 1
+            #     pdx = 0
+            #     pdy = 0
         elif self.moveset == "random":
             self.total += 1
             self.accepted += 1
@@ -161,8 +161,8 @@ class Simulation():
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
                     init_y = screen.get_height()/2
                 elif spawning_protocol == "uniform":
-                    # init_x = bounding_box.left + (2.05 * radius * current_column) - radius
-                    init_x = bounding_box.left + (bounding_box.width/n * current_column) - radius
+                    init_x = bounding_box.left + (2.05 * radius * current_column) - radius
+                    # init_x = bounding_box.left + (bounding_box.width/n * current_column) - radius
                     # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
                     init_y = screen.get_height()/2
                 particle = Particle("red", radius, width=width, init_pos=pygame.Vector2(init_x, init_y), moveset=moveset, bounding_box=self.rect_value)
