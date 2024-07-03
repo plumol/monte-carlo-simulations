@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 10
+tick_speed = 1000
 
 m = 250
 
@@ -81,6 +81,7 @@ class Particle(pygame.Rect):
             #     self.accepted -= 1
             #     pdx = 0
             #     pdy = 0
+            pdx = 1
         elif self.moveset == "random":
             self.total += 1
             self.accepted += 1
@@ -233,7 +234,7 @@ class Simulation():
                 #particle.color = colors[rand]
                 particles[k].accepted -= 1
                 particles[k].move(-pdx, 0)
-                valid, side = particles[k].check_valid_move()
+                #valid, side = particles[k].check_valid_move()
                 #print(valid)
         
         #particle_list[k].moves.append(particle_list[k].pos[:])
@@ -572,7 +573,7 @@ class Simulation():
 
 #pygame.draw.lines(screen, "black", False, particle_list[0].moves, 10)
 
-markov = Simulation("markov", 1000000, 400, n_particles=4, spawning_protocol="uniform")
+markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
 m_x_pos, m_y_pos = markov.simulate()
 
 # ecmc = Simulation("event", 500000, 400, n_particles=4, spawning_protocol="uniform")

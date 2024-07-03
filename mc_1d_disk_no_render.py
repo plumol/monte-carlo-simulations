@@ -24,7 +24,7 @@ class Particle():
 
         self.theta = np.random.uniform(0, 2 * np.pi)
         self.v = 0.0
-        self.delta = 50
+        self.delta = 100
 
         # this line is supposed to be an initial movement, but it doesn't actually move until you press R
         #self.check_valid_move(self.dx, self.dy)
@@ -34,13 +34,13 @@ class Particle():
         pass
     
     def is_collision(self, other_particle):
-        distance = np.sqrt((self.pos[0] - other_particle.pos[0])**2 + (self.pos[1] - other_particle.pos[1])**2)
+        distance = np.abs((self.pos[0] - other_particle.pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
         return distance < self.radius + other_particle.radius and distance > 0
             
     def propose_new_move(self):
         self.total += 1
         self.accepted += 1
-        pdx = np.random.uniform(0, self.delta)
+        pdx = np.random.uniform(-self.delta, self.delta)
         return pdx
 
     def check_valid_move(self):
@@ -66,6 +66,8 @@ class Simulation():
             Uniform spawning leads to uniformly initialized particles in a row, column formation.
         """
         self.x_pos = []
+        self.attemped_x = []
+        self.collided_x = []
         self.y_pos = []
         self.particle_list = []
         self.structure_factors = []
@@ -111,8 +113,8 @@ class Simulation():
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
                     # init_y = screen.get_height()/2
                 elif spawning_protocol == "uniform":
-                    # init_x = 0 + (2.05 * radius * current_column) - radius
-                    init_x = 0 + (bounding_box/n * current_column) - radius
+                    init_x = 0 + (2.05 * radius * current_column) - radius
+                    # init_x = 0 + (bounding_box/n * current_column) - radius
                     # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
                     # init_y = screen.get_height()/2
                 particle = Particle("red", radius, width=width, init_pos=[init_x, 0], moveset=moveset, bounding_box=self.rect_value)
@@ -149,46 +151,39 @@ class Simulation():
 
     def markov_chain_sequence(self, particles):
         k = np.random.randint(0, len(particles))
+        #print(k)
         pdx = particles[k].propose_new_move()
+        init_pos = particles[k].pos[0]
         particles[k].move(pdx, 0)
-        valid, side = particles[k].check_valid_move()
-        if not valid:
-            if side == 0:
-                particles[k].move(self.rect_value , 0)
-                pdx += self.rect_value 
-            elif side == 1:
-                particles[k].move(-self.rect_value , 0)
-                print(particles[k].pos[0], particles[k].pos[0] + self.rect_value)
-                pdx += -self.rect_value 
-                print(pdx, pdx + self.rect_value)
-            # particles[k].accepted -= 1
-            # particles[k].move(-pdx, 0)
-            # #particles[k].accepted -= 1
-            # #print("STOP")
-            
+
+        # PBC
+        # valid, side = particles[k].check_valid_move()
+        # if not valid:
+        particles[k].pos[0] = particles[k].pos[0] % self.rect_value
+
         for idx, particle in enumerate(particles):
             if idx == k:
                 continue
             if particles[k].is_collision(particle):
-                # setting random colors per collision
-                #rand = np.random.randint(0, len(colors))
-                #particle.color = colors[rand]
+                #print(particles[k].pos[0], particle.pos[0])
                 particles[k].accepted -= 1
-                particles[k].move(-pdx, 0)
-                continue
-                #print(particles[k].pos[0], particles[k].pos[0] + pdx)
-                # valid, side = particles[k].check_valid_move()
-                #print(valid)
+                # particles[k].move(-pdx, 0)   
+                # self.attemped_x.append(particles[k].pos[0])
+                # self.collided_x.append(particle.pos[0])
+                particles[k].pos[0] = init_pos
+                break
         
+
         # sanity check for collisions
         # for particle in particles:
         #     if particles[k].is_collision(particle):
         #         print("COLLIDED INVALID")
-        
-        self.x_pos.append(particles[k].pos[0])
+        #         print(particles[k].pos[0], particles[idx].pos[0])
+        # self.x_pos.append(particles[k].pos[0])
         # self.y_pos.append(particles[k].pos[1])
-        # for particle in particles:
-        #     self.x_pos.append(particle.pos[0])
+        # if valid:
+        #     for particle in particles:
+        self.x_pos.append(particles[k].pos[0])
 
 
     def direct_sampling_sequence(self, particles):
@@ -391,6 +386,7 @@ class Simulation():
             self.sampling_method(particles=self.particle_list)
 
             count += 1
+            self.dt += 1
             if count % 100000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
@@ -417,10 +413,10 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 1_000_000
+N_TRIALS = 10_000_000
 
-markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-m_x_pos, m_y_pos = markov.simulate()
+# markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
+# m_x_pos, m_y_pos = markov.simulate()
 
 # ecmc = Simulation("event", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
 # e_x_pos, e_y_pos = ecmc.simulate()
@@ -433,7 +429,7 @@ m_x_pos, m_y_pos = markov.simulate()
 # ecmc.save_positions("ecmc_1mil-1D.csv")
 # ecmc_ff.save_positions("ecmc_ff_1mil-1D.csv")
 
-# markov.save_structure_factors("markov_sf_10m-3.csv")
+# markov.save_structure_factors("markov_sf_10m-newsf.csv")
 # ecmc.save_structure_factors("ecmc_sf_10m-newsf-ff.csv")
 # ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-newsf-ff.csv")
 
@@ -451,18 +447,19 @@ m_x_pos, m_y_pos = markov.simulate()
 # e_ff_y_pos = ecmc_ff_df["y"].to_list()
 
 # load saved Structure Factor CSV
-# markov_sf_df = pd.read_csv("markov_sf_10m-3.csv")
-# markov_sf = markov_sf_df["sf"].to_list()
+markov_sf_df = pd.read_csv("markov_sf_10m-newsf.csv")
+markov_sf = markov_sf_df["sf"].to_list()
 
-# ecmc_sf_df = pd.read_csv("ecmc_sf_10m-newsf-ff.csv")
-# ecmc_sf = ecmc_sf_df["sf"].to_list()
+ecmc_sf_df = pd.read_csv("ecmc_sf_10m-newsf-ff.csv")
+ecmc_sf = ecmc_sf_df["sf"].to_list()
 
-# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_10m-newsf-ff.csv")
-# ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
+ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_10m-newsf-ff.csv")
+ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
 fig = plt.figure()
-plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
+
+# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
 
 # plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
@@ -473,16 +470,16 @@ plt.show()
 
 # structure factors
 fig = plt.figure()
-plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
+# plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
 # plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
 
 # after loading SF!
-# plt.hist(np.array(markov_sf, dtype=complex), 50, histtype='step', label="markov", density=True )
-# plt.hist(np.array(ecmc_sf, dtype=complex), 100, histtype='step', label="ecmc", density=True)
-# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 100, histtype='step', label="ecmc ff", density=True)
+plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
+plt.hist(np.array(ecmc_sf, dtype=complex), 100, histtype='step', label="ecmc", density=True, cumulative=True)
+plt.hist(np.array(ecmc_ff_sf, dtype=complex), 100, histtype='step', label="ecmc ff", density=True, cumulative=True)
 
-# plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors, dtype=complex), label="markov" )
+# plt.plot([10000 * i for i in range(len(markov_sf))], np.array(markov_sf, dtype=complex), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc_sf))], np.array(ecmc_sf, dtype=complex), label="ecmc")
 # plt.plot([10000 * i for i in range(len(ecmc_ff_sf))], np.array(ecmc_ff_sf, dtype=complex), label="ecmc ff")
 
