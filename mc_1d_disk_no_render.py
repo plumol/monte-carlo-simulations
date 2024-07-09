@@ -55,7 +55,7 @@ class Particle():
 
 class Simulation():
 
-    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, exp_var = 1,spawning_protocol="random"):
+    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, diameter=48, exp_var = 1,spawning_protocol="random"):
         """
         Initializes a Monte Carlo simulation of hard disks within a bounding box. 
 
@@ -93,7 +93,7 @@ class Simulation():
         self.rect_value = bounding_box_size
         # self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
-        self.populate_spawning(n_particles, 24, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
+        self.populate_spawning(n_particles, diameter/2, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
         
 
     #print(particle_list)
@@ -215,7 +215,7 @@ class Simulation():
         v = 1
         particles[k].v = v
 
-        tau_chain = 10
+        tau_chain = np.random.exponential(self.rect_value)
         while tau_chain > 0:
 
             # initialize all particles to be infinite colliding time away, stored as (idx, time)
@@ -282,7 +282,7 @@ class Simulation():
         # v = [1, 1]
         particles[k].v = v
 
-        tau_chain = 10
+        tau_chain = np.random.exponential(self.rect_value)
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
@@ -394,7 +394,6 @@ class Simulation():
                 print(f"Time taken: {toc - tic}")
                 tic = time.perf_counter()
             if count % 10000 == 0 :
-                
                 self.structure_factor()
 
         print("Finished!")
@@ -415,23 +414,23 @@ class Simulation():
 
 N_TRIALS = 10_000_000
 
-# markov = Simulation("markov", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-# m_x_pos, m_y_pos = markov.simulate()
+markov = Simulation("markov", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
+m_x_pos, m_y_pos = markov.simulate()
 
-# ecmc = Simulation("event", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-# e_x_pos, e_y_pos = ecmc.simulate()
+ecmc = Simulation("event", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
+e_x_pos, e_y_pos = ecmc.simulate()
 
-# ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=4, spawning_protocol="uniform")
-# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
+e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
 # ecmc.save_positions("ecmc_1mil-1D.csv")
 # ecmc_ff.save_positions("ecmc_ff_1mil-1D.csv")
 
-# markov.save_structure_factors("markov_sf_10m-newsf.csv")
-# ecmc.save_structure_factors("ecmc_sf_10m-newsf-ff.csv")
-# ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-newsf-ff.csv")
+markov.save_structure_factors("markov_sf_10m-6003.csv")
+ecmc.save_structure_factors("ecmc_sf_10m-6003.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-6003.csv")
 
 # load saved CSV files
 # markov_df = pd.read_csv("markov_sampling_1mil-0620.csv")
@@ -447,37 +446,37 @@ N_TRIALS = 10_000_000
 # e_ff_y_pos = ecmc_ff_df["y"].to_list()
 
 # load saved Structure Factor CSV
-markov_sf_df = pd.read_csv("markov_sf_10m-newsf.csv")
-markov_sf = markov_sf_df["sf"].to_list()
+# markov_sf_df = pd.read_csv("markov_sf_10m-2010.csv")
+# markov_sf = markov_sf_df["sf"].to_list()
 
-ecmc_sf_df = pd.read_csv("ecmc_sf_10m-newsf-ff.csv")
-ecmc_sf = ecmc_sf_df["sf"].to_list()
+# ecmc_sf_df = pd.read_csv("ecmc_sf_10m-2010.csv")
+# ecmc_sf = ecmc_sf_df["sf"].to_list()
 
-ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_10m-newsf-ff.csv")
-ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
+# ecmc_ff_sf_df = pd.read_csv("ecmc_ff_sf_10m-2010.csv")
+# ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
 fig = plt.figure()
 
-# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
+plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
 
-# plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
+plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
-# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
+plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
 
 plt.legend()
 plt.show()
 
 # structure factors
 fig = plt.figure()
-# plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
-# plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
+plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
+plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
 
 # after loading SF!
-plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
-plt.hist(np.array(ecmc_sf, dtype=complex), 100, histtype='step', label="ecmc", density=True, cumulative=True)
-plt.hist(np.array(ecmc_ff_sf, dtype=complex), 100, histtype='step', label="ecmc ff", density=True, cumulative=True)
+# plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
+# plt.hist(np.array(ecmc_sf, dtype=complex), 100, histtype='step', label="ecmc", density=True, cumulative=True)
+# plt.hist(np.array(ecmc_ff_sf, dtype=complex), 100, histtype='step', label="ecmc ff", density=True, cumulative=True)
 
 # plt.plot([10000 * i for i in range(len(markov_sf))], np.array(markov_sf, dtype=complex), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc_sf))], np.array(ecmc_sf, dtype=complex), label="ecmc")
