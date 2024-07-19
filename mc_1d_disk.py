@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 1000
+tick_speed = 10
 
 m = 250
 
@@ -125,6 +125,9 @@ class Simulation():
         self.running = True
         self.trials = n_trials
         self.sm = sampling_method
+        self.diameter = 3
+
+        self.mean = (bounding_box_size - n_particles*2*self.diameter)/n_particles
 
         if sampling_method == "direct":
             self.sampling_method = self.direct_sampling_sequence
@@ -142,7 +145,7 @@ class Simulation():
         self.rect_value = pygame.Rect(screen.get_width()/4, screen.get_height()/4, bounding_box_size, 1)
         self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
-        self.populate_spawning(n_particles, 24, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
+        self.populate_spawning(n_particles, 5, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
         
 
     #print(particle_list)
@@ -277,7 +280,7 @@ class Simulation():
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
 
-        tau_chain = 50
+        tau_chain = 400
         while tau_chain > 0:
             # print("initial velocity", particles[k].v)
             # print("tau chain", tau_chain)
@@ -390,14 +393,15 @@ class Simulation():
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
 
-        tau_chain = 100
+        tau_chain = 400
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
         while tau_chain > 0:
-            sampled_u = np.random.uniform(0, 1)
-            P_T = np.random.exponential(1)
-            x_ff = -1/P_T * np.log(sampled_u)
+            # sampled_u = np.random.uniform(0, 1)
+            # P_T = np.random.exponential(1)
+            # x_ff = -1/P_T * np.log(sampled_u)
+            x_ff = np.random.exponential(self.mean)
             #print(x_ff)
             
             # print("initial velocity", particles[k].v)
@@ -573,14 +577,14 @@ class Simulation():
 
 #pygame.draw.lines(screen, "black", False, particle_list[0].moves, 10)
 
-markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
-m_x_pos, m_y_pos = markov.simulate()
+# markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
+# m_x_pos, m_y_pos = markov.simulate()
 
-# ecmc = Simulation("event", 500000, 400, n_particles=4, spawning_protocol="uniform")
+# ecmc = Simulation("event", 500000, 400, n_particles=20, spawning_protocol="uniform")
 # e_x_pos, e_y_pos = ecmc.simulate()
 
-# ecmc_ff = Simulation("event_ff", 1000000, 400, n_particles=4, spawning_protocol="uniform")
-# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+ecmc_ff = Simulation("event_ff", 1000000, 400, n_particles=20, spawning_protocol="uniform")
+e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
@@ -617,7 +621,7 @@ m_x_pos, m_y_pos = markov.simulate()
 # x pos pdf
 fig = plt.figure()
 
-plt.hist(np.array(m_x_pos) - markov.rect_value.left, 40, density=True, histtype='step', label="markov x")
+# plt.hist(np.array(m_x_pos) - markov.rect_value.left, 40, density=True, histtype='step', label="markov x")
 
 # plt.hist(np.array(e_x_pos) - ecmc.rect_value.left, 40, density=True, histtype='step', label="ecmc x")
 

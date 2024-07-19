@@ -24,7 +24,7 @@ class Particle():
 
         self.theta = np.random.uniform(0, 2 * np.pi)
         self.v = 0.0
-        self.delta = 100
+        self.delta = 10
 
         # this line is supposed to be an initial movement, but it doesn't actually move until you press R
         #self.check_valid_move(self.dx, self.dy)
@@ -55,7 +55,7 @@ class Particle():
 
 class Simulation():
 
-    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, diameter=48, exp_var = 1,spawning_protocol="random"):
+    def __init__(self, sampling_method, n_trials, bounding_box_size=200, n_particles=4, diameter=48, exp_var = 10, spawning_protocol="random"):
         """
         Initializes a Monte Carlo simulation of hard disks within a bounding box. 
 
@@ -71,11 +71,15 @@ class Simulation():
         self.y_pos = []
         self.particle_list = []
         self.structure_factors = []
+        self.events = []
+        self.var_mix = []
+
         self.dt = 0
         self.running = True
         self.trials = n_trials
         self.sm = sampling_method
-        self.mean = exp_var
+        self.mean = (bounding_box_size - n_particles*diameter)/n_particles
+        
 
         if sampling_method == "direct":
             self.sampling_method = self.direct_sampling_sequence
@@ -94,6 +98,8 @@ class Simulation():
         # self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
         self.populate_spawning(n_particles, diameter/2, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
+        print([particle.pos for particle in self.particle_list])
+        self.active_idx = np.random.randint(0, len(self.particle_list))
         
 
     #print(particle_list)
@@ -141,12 +147,71 @@ class Simulation():
 
         self.structure_factors.append(structure)
 
+    def mixing_times(self):
+        w = []
+        # for every particle, find the distance between itself, and the particle "half-distance" away
+        # ex. system size of 8, (0, 4), (1, 5), (2, 6), (3, 7), etc. (i, i + N/2)
+        # find x_(i+N/2) - x_i - N*diameter/2
+        # find variance
+
+        for i in range(int(len(self.particle_list)/2)):
+            #print(i, i + len(self.particle_list)/2)
+            if self.particle_list[i].pos[0] < self.particle_list[i + int(len(self.particle_list)/2)].pos[0]:
+                pdx = self.particle_list[i + int(len(self.particle_list)/2)].pos[0] - self.particle_list[i].pos[0] 
+            else:
+                pdx = self.particle_list[i + int(len(self.particle_list)/2)].pos[0] + self.rect_value - self.particle_list[i].pos[0]
+
+            w_cal = pdx - len(self.particle_list)*self.particle_list[0].radius
+            distance = np.abs((self.particle_list[i].pos[0] - self.particle_list[i + int(len(self.particle_list)/2)].pos[0] + self.rect_value/2)%self.rect_value - self.rect_value/2)
+            w_dist = distance - len(self.particle_list)*self.particle_list[0].radius
+            w.append(w_cal)
+            
+            #print(self.particle_list[i].pos[0], self.particle_list[i + int(len(self.particle_list)/2)].pos[0], w_cal, w_dist)
+            #print(pdx, distance)
+            # w.append(distance - len(self.particle_list)*self.particle_list[0].radius)
+        #print(w, np.var(w))
+        self.var_mix.append(np.var(w))
+        #time.sleep(2)
+    
+    def mixing_times2(self):
+        x_prime = sorted([particle.pos[0] if particle.pos[0] >= self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list])
+
+        u = []
+
+        def delta_i(i):
+            a_i =  0
+            if i > len(self.particle_list):
+                a_i = self.rect_value
+            a_j = 0
+            if i-1 < 0:
+                a = -self.rect_value
+            elif i - 1 > len(self.particle_list):
+                a = self.rect_value
+            a = x_prime[(i-1)%len(self.particle_list)] + a_i - (x_prime[(i-2)%len(self.particle_list)] + a_j) - self.particle_list[0].radius * 2
+            # if i-2 < 0:
+            #     a -= self.rect_value
+            # if i - 1 < 0:
+            #     a -= self.rect_value
+            # if i-2 > len(self.particle_list):
+            #     a += self.rect_value
+            # if i-1 > len(self.particle_list):
+            #     a+= self.rect_value
+            
+            return a
+        for j in range(1, len(self.particle_list) + 1):
+            u_i = 0
+            for i in range(0, int((len(self.particle_list))/2) + 1):
+                u_i += delta_i(i+j)
+                #print(i)
+            u.append(u_i)
+        self.var_mix.append(np.var(u))
+
     def save_structure_factors(self, file_name):
-        df = pd.DataFrame(self.structure_factors, columns=["sf"])
+        df = pd.DataFrame(zip(self.structure_factors, self.events, self.var_mix), columns=["sf", "events", "var_mix"])
         df.to_csv(file_name)
 
     def save_positions(self, file_name):
-        df = pd.DataFrame(zip(self.x_pos, self.y_pos), columns=["x", "y"])
+        df = pd.DataFrame(zip(self.x_pos), columns=["x"])
         df.to_csv(file_name)
 
     def markov_chain_sequence(self, particles):
@@ -215,7 +280,8 @@ class Simulation():
         v = 1
         particles[k].v = v
 
-        tau_chain = np.random.exponential(self.rect_value)
+        tau_chain = np.random.exponential(10)
+        events = 0
         while tau_chain > 0:
 
             # initialize all particles to be infinite colliding time away, stored as (idx, time)
@@ -259,6 +325,8 @@ class Simulation():
             k = next_idx
             particles[k].v = v
             
+            # print(tau_chain)
+            events += 1
             tau_chain -= colliding_times
 
             # sanity check for collisions
@@ -266,7 +334,7 @@ class Simulation():
             #     if particles[k].is_collision(particle):
             #         print("COLLIDED INVALID")
             #         print(particles[k].pos[0], particles[idx].pos[0])
-
+        self.events.append(events)
         
         # reset all velocities to zero and store positions
         for particle in particles:
@@ -277,12 +345,12 @@ class Simulation():
             particle.v = 0
 
     def event_chain_ff_sequence(self, particles):
-        k = np.random.randint(0, len(particles))
+        k = self.active_idx
         v = 1
         # v = [1, 1]
         particles[k].v = v
-
-        tau_chain = np.random.exponential(self.rect_value)
+        events = 0 
+        tau_chain = np.random.exponential(10)
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
@@ -354,19 +422,21 @@ class Simulation():
                     if side == 1:
                         particles[k].move(-self.rect_value , 0)
                         pdx += -self.rect_value 
-                
+            
+            events += 1
             tau_chain -= colliding_times
+            self.x_pos.append(particles[k].pos[0])
 
             # # sanity check for collisions
             # for idx, particle in enumerate(particles):
             #     if particles[k].is_collision(particle):
             #         print("COLLIDED INVALID")
             #         print(particles[k].pos[0], particles[idx].pos[0])
-
-        
+        self.active_idx = k
+        self.events.append(events)
         # reset all velocities to zero
         for particle in particles:
-            self.x_pos.append(particle.pos[0])
+            
             particle.accepted += 1
             particle.total += 1
             particle.v = 0
@@ -391,10 +461,11 @@ class Simulation():
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
                 toc = time.perf_counter()
-                print(f"Time taken: {toc - tic}")
+                print(f"Time taken: {toc - tic}. Estimated remaining {(self.trials-count)/100000*(toc-tic)}")
                 tic = time.perf_counter()
-            if count % 10000 == 0 :
+            if count % 1 == 0 :
                 self.structure_factor()
+                self.mixing_times2()
 
         print("Finished!")
         return self.x_pos, self.y_pos 
@@ -412,25 +483,31 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 10_000_000
+N_TRIALS = 100_000
+SYSTEM_LENGTH = 400
+N_PARTICLES = 8
+DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
 
-markov = Simulation("markov", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
-m_x_pos, m_y_pos = markov.simulate()
+# markov = Simulation("markov", N_TRIALS, SYSTEM_LENGTH, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+# m_x_pos, m_y_pos = markov.simulate()
 
-ecmc = Simulation("event", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
-e_x_pos, e_y_pos = ecmc.simulate()
+# ecmc = Simulation("event", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+# e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=60, diameter=3.3333, spawning_protocol="uniform")
+ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
 e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
-# ecmc.save_positions("ecmc_1mil-1D.csv")
-# ecmc_ff.save_positions("ecmc_ff_1mil-1D.csv")
-
-markov.save_structure_factors("markov_sf_10m-6003.csv")
-ecmc.save_structure_factors("ecmc_sf_10m-6003.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-6003.csv")
+# ecmc.save_positions("test.csv")
+# ecmc_ff.save_positions("ecmc_ff_1mil-8m2.csv")
+# 
+# markov.save_structure_factors("markov_sf_10m-120.csv")
+# ecmc.save_structure_factors("ecmc_sf_10m-2-py.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-128-m3-2.csv")
+# x_8 = np.linspace(0, np.sum(ecmc_ff.events)/16, len(e_ff_x_pos))
+# plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
+# plt.show()
 
 # load saved CSV files
 # markov_df = pd.read_csv("markov_sampling_1mil-0620.csv")
@@ -456,22 +533,29 @@ ecmc_ff.save_structure_factors("ecmc_ff_sf_10m-6003.csv")
 # ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
-fig = plt.figure()
+# fig = plt.figure()
 
-plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
+# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
 
-plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
+# plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
-plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
+# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
 
-plt.legend()
-plt.show()
+# plt.scatter(np.array(m_x_pos[-N_PARTICLES:]), [0 for i in range(N_PARTICLES)], 10, alpha=0.3, label="markov x")
 
-# structure factors
-fig = plt.figure()
-plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
-plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+# plt.scatter(np.array(e_x_pos[-N_PARTICLES:]), [0.5 for i in range(N_PARTICLES)], 40, alpha=0.3, label="ecmc x")
+
+# plt.scatter(np.array(e_ff_x_pos[-N_PARTICLES:]), [0.7 for i in range(N_PARTICLES)], 40, alpha=0.3, label="ecmc ff x")
+
+
+# plt.legend()
+# plt.show()
+
+# # structure factors
+# fig = plt.figure()
+# plt.plot([1 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
+# plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
+# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
 
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
@@ -482,7 +566,7 @@ plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ec
 # plt.plot([10000 * i for i in range(len(ecmc_sf))], np.array(ecmc_sf, dtype=complex), label="ecmc")
 # plt.plot([10000 * i for i in range(len(ecmc_ff_sf))], np.array(ecmc_ff_sf, dtype=complex), label="ecmc ff")
 
-plt.title("Structure Factor")
+# plt.title("Structure Factor")
 
 # after loading!
 # plt.hist(np.array(m_x_pos) - 260, 40, density=True, histtype='step', label="markov x")
@@ -495,6 +579,13 @@ plt.title("Structure Factor")
 # plt.hist(np.array(e_y_pos) - 540, 40, density=True, histtype='step', label="ecmc y")
 
 # plt.xlim(0)
-plt.legend()
+# plt.legend()
 
-plt.show()
+# plt.show()
+
+
+# df = pd.read_csv("./cpp_test/mc_1d_disk/test_ff.csv")
+# x_pos = df["x"].to_list()
+# plt.hist(np.array(x_pos), 40, density=True, histtype='step', label="ecmc x")
+# plt.scatter(x_pos[-10:], [0 for i in range(10)])
+# plt.show()
