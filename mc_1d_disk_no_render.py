@@ -174,37 +174,36 @@ class Simulation():
         #time.sleep(2)
     
     def mixing_times2(self):
-        x_prime = sorted([particle.pos[0] if particle.pos[0] >= self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list])
+        x_mix = [particle.pos[0] if particle.pos[0] > self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list]
 
-        u = []
+        #sort better
+        x_mix = sorted(x_mix)
+        #print(x_mix)
+        w = []
+        
+        n_particles = len(self.particle_list)
+        # first iter
+        # for i in range(1, n_particles+1):
+        #     w_i = 0
+        #     for j in range(0, int(n_particles/2) + 1):
+        #     #     #print((i+j-1)%n_particles,(i+j-2)%n_particles, i, i+j)
+        #     #     #print(x_compact[(i+j - 1)%n_particles], x_compact[(i+j - 2)%n_particles])
+        #         d_i = (x_mix[(i+j - 1)%n_particles] - x_mix[(i+j - 2)%n_particles]) - self.particle_list[0].radius*2
+        #         w_i += d_i
+        #     w.append(w_i)
 
-        def delta_i(i):
-            a_i =  0
-            if i > len(self.particle_list):
-                a_i = self.rect_value
-            a_j = 0
-            if i-1 < 0:
-                a = -self.rect_value
-            elif i - 1 > len(self.particle_list):
-                a = self.rect_value
-            a = x_prime[(i-1)%len(self.particle_list)] + a_i - (x_prime[(i-2)%len(self.particle_list)] + a_j) - self.particle_list[0].radius * 2
-            # if i-2 < 0:
-            #     a -= self.rect_value
-            # if i - 1 < 0:
-            #     a -= self.rect_value
-            # if i-2 > len(self.particle_list):
-            #     a += self.rect_value
-            # if i-1 > len(self.particle_list):
-            #     a+= self.rect_value
-            
-            return a
-        for j in range(1, len(self.particle_list) + 1):
-            u_i = 0
-            for i in range(0, int((len(self.particle_list))/2) + 1):
-                u_i += delta_i(i+j)
-                #print(i)
-            u.append(u_i)
-        self.var_mix.append(np.var(u))
+        # exact s_i+n/2 - s_i, reduced with notes
+        for i in range(1, n_particles+1):
+            w_i = 0
+            for j in range(i + int(n_particles/2), i, -1):
+                #print(i, j)
+                #print(x_compact[(j-1)%n_particles] - x_compact[(j-2)%n_particles] - diameter)
+                w_i += x_mix[(j-1)%n_particles] - x_mix[(j-2)%n_particles] - self.particle_list[0].radius*2
+                
+        #print("final wi ", w_i)
+            w.append(w_i)
+        
+        self.var_mix.append(np.var(w))
 
     def save_structure_factors(self, file_name):
         df = pd.DataFrame(zip(self.structure_factors, self.events, self.var_mix), columns=["sf", "events", "var_mix"])
@@ -504,7 +503,7 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # 
 # markov.save_structure_factors("markov_sf_10m-120.csv")
 # ecmc.save_structure_factors("ecmc_sf_10m-2-py.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-128-m3-2.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-8s-1.csv")
 # x_8 = np.linspace(0, np.sum(ecmc_ff.events)/16, len(e_ff_x_pos))
 # plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
 # plt.show()
