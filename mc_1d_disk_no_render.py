@@ -174,10 +174,10 @@ class Simulation():
         #time.sleep(2)
     
     def mixing_times2(self):
-        x_mix = [particle.pos[0] if particle.pos[0] > self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list]
-
+        # x_mix = [particle.pos[0] if particle.pos[0] > self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list]
+        x_mix = [particle.pos[0] for particle in self.particle_list]
         #sort better
-        x_mix = sorted(x_mix)
+        #x_mix = sorted(x_mix)
         #print(x_mix)
         w = []
         
@@ -484,7 +484,7 @@ class Simulation():
 
 N_TRIALS = 100_000
 SYSTEM_LENGTH = 400
-N_PARTICLES = 8
+N_PARTICLES = 32
 DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
 
 # markov = Simulation("markov", N_TRIALS, SYSTEM_LENGTH, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
@@ -503,7 +503,7 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # 
 # markov.save_structure_factors("markov_sf_10m-120.csv")
 # ecmc.save_structure_factors("ecmc_sf_10m-2-py.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-8s-1.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-32s-1.csv")
 # x_8 = np.linspace(0, np.sum(ecmc_ff.events)/16, len(e_ff_x_pos))
 # plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
 # plt.show()
