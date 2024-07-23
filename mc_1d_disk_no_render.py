@@ -95,7 +95,6 @@ class Simulation():
             moveset = "normal"
 
         self.rect_value = bounding_box_size
-        # self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
         self.populate_spawning(n_particles, diameter/2, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
         print([particle.pos for particle in self.particle_list])
@@ -117,12 +116,9 @@ class Simulation():
                 if spawning_protocol == "random":
                     init_x = np.random.uniform(0 + radius + 0.1, bounding_box - radius - 0.1)
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
-                    # init_y = screen.get_height()/2
                 elif spawning_protocol == "uniform":
                     init_x = 0 + (2.05 * radius * current_column) - radius
                     # init_x = 0 + (bounding_box/n * current_column) - radius
-                    # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
-                    # init_y = screen.get_height()/2
                 particle = Particle("red", radius, width=width, init_pos=[init_x, 0], moveset=moveset, bounding_box=self.rect_value)
                 for existing_particle in self.particle_list:
                     if particle.is_collision(existing_particle):
@@ -140,38 +136,11 @@ class Simulation():
         inner_sf = 0.0
         q = (2*np.pi)/self.rect_value
 
-        # structure = 1/len(self.x_pos) * np.abs(np.sum([np.exp(q*1j * np.array(self.x_pos))]))**2
         for particle in self.particle_list:
             inner_sf += np.exp(q*1j * particle.pos[0])
         structure = np.abs(inner_sf)**2/len(self.particle_list)
 
         self.structure_factors.append(structure)
-
-    def mixing_times(self):
-        w = []
-        # for every particle, find the distance between itself, and the particle "half-distance" away
-        # ex. system size of 8, (0, 4), (1, 5), (2, 6), (3, 7), etc. (i, i + N/2)
-        # find x_(i+N/2) - x_i - N*diameter/2
-        # find variance
-
-        for i in range(int(len(self.particle_list)/2)):
-            #print(i, i + len(self.particle_list)/2)
-            if self.particle_list[i].pos[0] < self.particle_list[i + int(len(self.particle_list)/2)].pos[0]:
-                pdx = self.particle_list[i + int(len(self.particle_list)/2)].pos[0] - self.particle_list[i].pos[0] 
-            else:
-                pdx = self.particle_list[i + int(len(self.particle_list)/2)].pos[0] + self.rect_value - self.particle_list[i].pos[0]
-
-            w_cal = pdx - len(self.particle_list)*self.particle_list[0].radius
-            distance = np.abs((self.particle_list[i].pos[0] - self.particle_list[i + int(len(self.particle_list)/2)].pos[0] + self.rect_value/2)%self.rect_value - self.rect_value/2)
-            w_dist = distance - len(self.particle_list)*self.particle_list[0].radius
-            w.append(w_cal)
-            
-            #print(self.particle_list[i].pos[0], self.particle_list[i + int(len(self.particle_list)/2)].pos[0], w_cal, w_dist)
-            #print(pdx, distance)
-            # w.append(distance - len(self.particle_list)*self.particle_list[0].radius)
-        #print(w, np.var(w))
-        self.var_mix.append(np.var(w))
-        #time.sleep(2)
     
     def mixing_times2(self):
         # x_mix = [particle.pos[0] if particle.pos[0] > self.particle_list[0].pos[0] else particle.pos[0] + self.rect_value for particle in self.particle_list]
@@ -183,24 +152,15 @@ class Simulation():
         
         n_particles = len(self.particle_list)
         # first iter
-        # for i in range(1, n_particles+1):
-        #     w_i = 0
-        #     for j in range(0, int(n_particles/2) + 1):
-        #     #     #print((i+j-1)%n_particles,(i+j-2)%n_particles, i, i+j)
-        #     #     #print(x_compact[(i+j - 1)%n_particles], x_compact[(i+j - 2)%n_particles])
-        #         d_i = (x_mix[(i+j - 1)%n_particles] - x_mix[(i+j - 2)%n_particles]) - self.particle_list[0].radius*2
-        #         w_i += d_i
-        #     w.append(w_i)
 
         # exact s_i+n/2 - s_i, reduced with notes
         for i in range(1, n_particles+1):
             w_i = 0
             for j in range(i + int(n_particles/2), i, -1):
-                #print(i, j)
-                #print(x_compact[(j-1)%n_particles] - x_compact[(j-2)%n_particles] - diameter)
-                w_i += x_mix[(j-1)%n_particles] - x_mix[(j-2)%n_particles] - self.particle_list[0].radius*2
-                
-        #print("final wi ", w_i)
+                distance = x_mix[(j-1)%n_particles] - x_mix[(j-2)%n_particles] - self.particle_list[0].radius*2
+                w_i += distance
+                if distance < 0:
+                    w_i += self.rect_value
             w.append(w_i)
         
         self.var_mix.append(np.var(w))
@@ -215,25 +175,18 @@ class Simulation():
 
     def markov_chain_sequence(self, particles):
         k = np.random.randint(0, len(particles))
-        #print(k)
         pdx = particles[k].propose_new_move()
         init_pos = particles[k].pos[0]
         particles[k].move(pdx, 0)
 
         # PBC
-        # valid, side = particles[k].check_valid_move()
-        # if not valid:
         particles[k].pos[0] = particles[k].pos[0] % self.rect_value
 
         for idx, particle in enumerate(particles):
             if idx == k:
                 continue
             if particles[k].is_collision(particle):
-                #print(particles[k].pos[0], particle.pos[0])
                 particles[k].accepted -= 1
-                # particles[k].move(-pdx, 0)   
-                # self.attemped_x.append(particles[k].pos[0])
-                # self.collided_x.append(particle.pos[0])
                 particles[k].pos[0] = init_pos
                 break
         
@@ -354,10 +307,6 @@ class Simulation():
         #print(P_T)
         
         while tau_chain > 0:
-            # sampled_u = np.random.uniform(0, 1)
-            # P_T = np.random.exponential(0.2)
-            # x_ff = -np.log(sampled_u)/P_T
-
             x_ff = np.random.exponential(self.mean)
 
             next_idx = (k+1)%len(particles)
@@ -380,7 +329,6 @@ class Simulation():
 
             # TODO: solve for x_ff_t
             x_ff_t = x_ff/particles[k].v
-            #print(x_ff_t, colliding_times)
             
             # choose factor field or regular collision time, and pick lifting particle
             # if ff, then next particle is i-1, if regular collision, next particle is i + 1
@@ -412,11 +360,9 @@ class Simulation():
             else:
                 # move to x + v * tau_chain
                 pdx = particles[k].v * tau_chain
-                #pdy = particles[k].v[1] * tau_chain
                 particles[k].move(pdx, 0)
                 valid, side = particles[k].check_valid_move()
                 if not valid:
-                    #print("help")
                     
                     if side == 1:
                         particles[k].move(-self.rect_value , 0)
@@ -484,7 +430,7 @@ class Simulation():
 
 N_TRIALS = 100_000
 SYSTEM_LENGTH = 400
-N_PARTICLES = 32
+N_PARTICLES = 16
 DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
 
 # markov = Simulation("markov", N_TRIALS, SYSTEM_LENGTH, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
@@ -503,7 +449,7 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # 
 # markov.save_structure_factors("markov_sf_10m-120.csv")
 # ecmc.save_structure_factors("ecmc_sf_10m-2-py.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-32s-1.csv")
+ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-16s-1.csv")
 # x_8 = np.linspace(0, np.sum(ecmc_ff.events)/16, len(e_ff_x_pos))
 # plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
 # plt.show()
@@ -580,11 +526,4 @@ ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-32s-1.csv")
 # plt.xlim(0)
 # plt.legend()
 
-# plt.show()
-
-
-# df = pd.read_csv("./cpp_test/mc_1d_disk/test_ff.csv")
-# x_pos = df["x"].to_list()
-# plt.hist(np.array(x_pos), 40, density=True, histtype='step', label="ecmc x")
-# plt.scatter(x_pos[-10:], [0 for i in range(10)])
 # plt.show()
