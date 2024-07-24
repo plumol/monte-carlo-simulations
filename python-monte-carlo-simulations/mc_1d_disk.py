@@ -15,7 +15,7 @@ m = 250
 
 class Particle(pygame.Rect):
     
-    def __init__(self, color, radius, width = 0, init_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2), moveset = "normal", pbc = False, bounding_box = None) -> None:
+    def __init__(self, color, radius, width = 0, init_pos = pygame.Vector2(screen.get_width() / 2, screen.get_height() / 2), moveset = "normal", pbc = False, bounding_box = None, h_i = 0) -> None:
 
         self.color = color
         self.pos = init_pos
@@ -24,6 +24,7 @@ class Particle(pygame.Rect):
         self.pbc = pbc
         self.moveset = moveset
         self.bounding_box = bounding_box
+        self.h_i = h_i
 
         self.moves = []
         self.accepted = 0
@@ -139,13 +140,14 @@ class Simulation():
             self.sampling_method = self.event_chain_sequence
             moveset = "normal"
         elif sampling_method == "event_ff":
-            self.sampling_method = self.event_chain_ff_sequence
+            self.sampling_method = self.event_chain_ff_sequence_wr
             moveset = "normal"
 
         self.rect_value = pygame.Rect(screen.get_width()/4, screen.get_height()/4, bounding_box_size, 1)
         self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
         self.populate_spawning(n_particles, 5, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
+        self.active_idx = np.random.randint(0, len(self.particle_list))
         
 
     #print(particle_list)
@@ -387,8 +389,9 @@ class Simulation():
             particle.total += 1
             particle.v[0], particle.v[1] = 0, 0
 
-    def event_chain_ff_sequence(self, particles):
-        k = np.random.randint(0, len(particles))
+    def event_chain_ff_sequence_nr(self, particles):
+        #k = np.random.randint(0, len(particles))
+        k = self.active_idx
         v = [1, 0]
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
@@ -507,7 +510,137 @@ class Simulation():
             #         print("COLLIDED INVALID")
             #         print(particles[k].pos.x - self.rect_value.left, particles[idx].pos.x - self.rect_value.left)
 
+        self.active_idx = k
+        # reset all velocities to zero
+        for particle in particles:
+            self.x_pos.append(particle.pos.x)
+            self.y_pos.append(particle.pos.y)
+            particle.accepted += 1
+            particle.total += 1
+            particle.v[0], particle.v[1] = 0, 0
+
+    def event_chain_ff_sequence_wr(self, particles):
+        k = np.random.randint(0, len(particles))
+        #k = self.active_idx
+        v = [1, 0]
+        # v = [1, 1]
+        particles[k].v[0], particles[k].v[1] = v[0], 0
+
+        tau_chain = 400
+        # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
+        #print(P_T)
         
+        while tau_chain > 0:
+            # sampled_u = np.random.uniform(0, 1)
+            # P_T = np.random.exponential(1)
+            # x_ff = -1/P_T * np.log(sampled_u)
+            x_ff = np.random.exponential(self.mean)
+            #print(x_ff)
+            
+            # print("initial velocity", particles[k].v)
+            # print("tau chain", tau_chain)
+
+            # initialize all particles to be infinite colliding time away, stored as (idx, time)
+
+            next_idx = (k+1)%len(particles)
+            prev_idx = (k-1)%len(particles)
+            #print(k, next_idx)
+            # particle is the STATIONARY particle
+            particle = particles[next_idx]
+            # pairwise collision time collisions
+                
+                # pass collision time calculation for the same particle
+
+            # calculating collision times for PBC, if MOVING.x < STATIONARY.x, calculate normal
+            # else if MOVING.X > STATIONARY.x, meaning it would have to wrap around due to PBC, PRETEND next collision is in the next box over
+            if particles[k].pos.x < particle.pos.x:
+                dx = particle.pos.x - particles[k].pos.x
+            else:
+                dx = (particle.pos.x + self.rect_value.width)  - particles[k].pos.x
+
+            dy = particle.pos.y - particles[k].pos.y
+
+            a = (particles[k].v[0]**2 + particles[k].v[1]**2)
+            b = 2 * -( particles[k].v[0] * dx + particles[k].v[1] * dy)
+            c = dx**2 + dy**2 - (particle.radius + particles[k].radius)**2
+
+            # if discriminant < 0, no real roots and no collisions, default is already set to inf
+            if b**2 - 4 * a * c < 0:
+                colliding_times = float("inf")
+            # quadratic equation
+            else:
+                t_1 = (-b + np.sqrt(b**2 -4 * a * c))/(2*a)
+                t_2 = (-b - np.sqrt(b**2 -4 * a * c))/(2*a)
+                colliding_times = min((t for t in (t_1, t_2) if t >= 0), default=float("inf"))
+
+            #print(a, b, c)
+            # print(t1, t2)
+            # 
+            # print("colliding times", colliding_times)
+
+            # remove any that are currently colliding:
+            # for idx, particle in enumerate(particles):
+            #     if particles[k].is_collision(particle):
+            #         del colliding_times[idx]
+            # check minimum collding time > 0 
+
+            # TODO: solve for x_ff_t
+            x_ff_t = x_ff/particles[k].v[0]
+            #print(x_ff_t, colliding_times)
+            
+            if x_ff_t < colliding_times:
+                colliding_times = x_ff_t
+                lifted_particle = prev_idx
+            else:
+                lifted_particle = next_idx
+            
+            # print("min_collide", min_colliding_time)
+            #print(colliding_times)
+
+            if colliding_times < tau_chain:
+                # move to collision
+                pdx = particles[k].v[0] * colliding_times
+                pdy = particles[k].v[1] * colliding_times
+                #pygame.draw.circle(screen, "black", (particles[k].pos.x + pdx, particles[k].pos.y + pdy), particles[k].radius, 3)
+
+                # print(colliding_times)
+                #print(particles[k].pos)
+                valid, side = particles[k].check_valid_move()
+                if not valid:
+                    #print("help")
+                    if side == 1:
+                        particles[k].move(-self.rect_value.width , 0)
+                        pdx += -self.rect_value.width
+
+                
+                # reset current particle velocity to 0
+                # update particle idx to the new particle
+                # update particle velocity 
+                particles[k].v[0], particles[k].v[1] = 0, 0
+                k = lifted_particle
+                particles[k].v[0], particles[k].v[1] = v[0], 0
+            else:
+                # move to x + v * tau_chain
+                pdx = particles[k].v[0] * tau_chain
+                pdy = particles[k].v[1] * tau_chain
+                particles[k].move(pdx, pdy)
+                valid, side = particles[k].check_valid_move()
+                if not valid:
+                    #print("help")
+                    
+                    if side == 1:
+                        particles[k].move(-self.rect_value.width , 0)
+                        pdx += -self.rect_value.width 
+                
+            tau_chain -= colliding_times
+
+            # # sanity check for collisions
+            # for idx, particle in enumerate(particles):
+            #     if particles[k].is_collision(particle):
+            #         print("COLLIDED INVALID")
+            #         print(particles[k].pos.x - self.rect_value.left, particles[idx].pos.x - self.rect_value.left)
+
+        #self.active_idx = k
         # reset all velocities to zero
         for particle in particles:
             self.x_pos.append(particle.pos.x)
