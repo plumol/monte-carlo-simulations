@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 10
+tick_speed = 1
 
 m = 250
 
@@ -122,6 +122,7 @@ class Simulation():
         self.y_pos = []
         self.particle_list = []
         self.structure_factors = []
+        self.events = []
         self.dt = 0
         self.running = True
         self.trials = n_trials
@@ -140,16 +141,17 @@ class Simulation():
             self.sampling_method = self.event_chain_sequence
             moveset = "normal"
         elif sampling_method == "event_ff":
-            self.sampling_method = self.event_chain_ff_sequence_wr
+            self.sampling_method = self.event_chain_ff_sequence_nr
             moveset = "normal"
 
         self.rect_value = pygame.Rect(screen.get_width()/4, screen.get_height()/4, bounding_box_size, 1)
         self.rect_value.center = (screen.get_width()/2, screen.get_height()/2)
 
         self.populate_spawning(n_particles, 5, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
-        self.active_idx = np.random.randint(0, len(self.particle_list))
-        
-        self.particle_list[len(self.particle_list)-1].h_i = 250
+        #self.active_idx = np.random.randint(0, len(self.particle_list))
+        self.active_idx = len(self.particle_list) - 1
+        #self.particle_list[len(self.particle_list)-1].h_i = 250
+        self.particle_list[0].h_i = self.mean
 
     #print(particle_list)
     
@@ -168,12 +170,12 @@ class Simulation():
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
                     init_y = screen.get_height()/2
                 elif spawning_protocol == "uniform":
-                    init_x = bounding_box.left + (2.05 * radius * current_column) - radius
+                    init_x = bounding_box.left + (2.001 * radius * current_column) - radius
                     # init_x = bounding_box.left + (bounding_box.width/n * current_column) - radius
                     # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
                     init_y = screen.get_height()/2
                 particle = Particle("red", radius, width=width, init_pos=pygame.Vector2(init_x, init_y), 
-                                    moveset=moveset, bounding_box=self.rect_value, h_i=self.mean)
+                                    moveset=moveset, bounding_box=self.rect_value, h_i=(len(self.particle_list)+1)*radius*2)
                 for existing_particle in self.particle_list:
                     if particle.is_collision(existing_particle):
                         break
@@ -375,6 +377,7 @@ class Simulation():
                         pdx += -self.rect_value.width 
             
             tau_chain -= colliding_times
+            print(tau_chain)
 
             # sanity check for collisions
             # for idx, particle in enumerate(particles):
@@ -398,7 +401,13 @@ class Simulation():
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
 
-        tau_chain = 400
+        events = 0
+        if len(self.events) < 1:
+            tau_chain = self.rect_value.width*(len(particles) + 1)/4
+        else:
+            tau_chain = self.rect_value.width
+        # tau_chain = 400
+        print(tau_chain)
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
@@ -461,7 +470,9 @@ class Simulation():
             # TODO: solve for x_ff_t
             x_ff_t = x_ff/particles[k].v[0]
             #print(x_ff_t, colliding_times)
-            
+            #print("hi")
+            # if k == len(self.particle_list) - 1:
+            #     print(x_ff_t, colliding_times, self.particle_list[k].h_i)
             if x_ff_t < colliding_times:
                 colliding_times = x_ff_t
                 lifted_particle = prev_idx
@@ -470,6 +481,7 @@ class Simulation():
             
             # print("min_collide", min_colliding_time)
             #print(colliding_times)
+            print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0])
 
             if colliding_times < tau_chain:
                 # move to collision
@@ -507,6 +519,9 @@ class Simulation():
                         pdx += -self.rect_value.width 
                 
             tau_chain -= colliding_times
+            events+=1
+            self.render()
+            pygame.display.flip()
 
             # # sanity check for collisions
             # for idx, particle in enumerate(particles):
@@ -515,6 +530,7 @@ class Simulation():
             #         print(particles[k].pos.x - self.rect_value.left, particles[idx].pos.x - self.rect_value.left)
 
         self.active_idx = k
+        self.events.append(events)
         # reset all velocities to zero
         for particle in particles:
             self.x_pos.append(particle.pos.x)
@@ -674,18 +690,23 @@ class Simulation():
             # check collisions and boundary conditions, if accept then move, if reject then don't move
             # update positions
             
-            self.render()
-
+            # self.render()
+            count += 1
+            
             self.sampling_method(particles=self.particle_list)
 
+            if count == 1:
+                for particle in self.particle_list:
+                    particle.h_i = self.mean
+
             # renders the screen
-            pygame.display.flip()
+            # pygame.display.flip()
             #pygame.time.delay(1000)
 
             self.dt = 1 / 100
             clock.tick(tick_speed)
             
-            count += 1
+            
             if count % 10000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
@@ -720,7 +741,7 @@ class Simulation():
 # ecmc = Simulation("event", 500000, 400, n_particles=20, spawning_protocol="uniform")
 # e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", 1000000, 400, n_particles=20, spawning_protocol="uniform")
+ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
 e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
@@ -756,7 +777,7 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # ecmc_ff_sf = ecmc_ff_sf_df["sf"].to_list()
 
 # x pos pdf
-fig = plt.figure()
+#fig = plt.figure()
 
 # plt.hist(np.array(m_x_pos) - markov.rect_value.left, 40, density=True, histtype='step', label="markov x")
 
@@ -764,10 +785,10 @@ fig = plt.figure()
 
 # plt.hist(np.array(e_ff_x_pos) - ecmc_ff.rect_value.left, 40, density=True, histtype='step', label="ecmc ff x")
 
-plt.show()
+#plt.show()
 
 # structure factors
-fig = plt.figure()
+#fig = plt.figure()
 # plt.plot([10000 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors, dtype=complex), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
 # plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
@@ -776,7 +797,7 @@ fig = plt.figure()
 # plt.hist(np.array(markov_sf, dtype=complex), label="markov", density=True )
 # plt.hist(np.array(ecmc_sf, dtype=complex), label="ecmc", density=True )
 # plt.hist(np.array(ecmc_ff_sf, dtype=complex), label="ecmc ff", density=True )
-plt.title("Structure Factor")
+#plt.title("Structure Factor")
 
 # after loading!
 # plt.hist(np.array(d_x_pos) - 260, 40, density=True, histtype='step', label="direct x")
@@ -792,12 +813,12 @@ plt.title("Structure Factor")
 # plt.hist(np.array(e_y_pos) - 540, 40, density=True, histtype='step', label="ecmc y")
 
 # plt.xlim(0)
-plt.legend()
+#plt.legend()
 
 
 #plt.clf()
 #fig, ax = plt.subplots()
 #hist = 0
 
-plt.show()
+#plt.show()
 pygame.quit()

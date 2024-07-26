@@ -16,6 +16,7 @@ class Particle {
         // static std::uniform_real_distribution<double> distribution(-delta, delta);
         double radius;
         double bounding_box;
+        double h_i;
 
         int accepted;
         int total;
@@ -55,9 +56,10 @@ class Particle {
             return pos;
         }
 
-        Particle(double radius, std::vector<double> init_pos, std::string moveset, double bounding_box){
+        Particle(double radius, std::vector<double> init_pos, std::string moveset, double bounding_box, double h_i){
             this->radius = radius;
             this->bounding_box = bounding_box;
+            this->h_i = h_i;
             this->total = 0;
             this->accepted = 0;
 
@@ -143,7 +145,7 @@ class Simulation {
                         init_x = (2.05 * radius * current_column) - radius;
                     }
                     std::vector<double> init_position({init_x, 0.0});
-                    Particle particle(radius, init_position, moveset, bounding_box);
+                    Particle particle(radius, init_position, moveset, bounding_box, (particles.size()+1)*radius*2);
 
                     bool add = true;
                     for (Particle &existing_particle : particles) {
@@ -329,6 +331,85 @@ class Simulation {
 
             while (tau_chain > 0) {
                 std::exponential_distribution<> dist_ff(1/mean);
+                double x_ff = dist_ff(generator);
+
+                int next_idx = (k+1)%particles.size();
+                int prev_idx = (k-1)%particles.size();
+
+                const Particle &particle = particles[next_idx];
+
+                double dx = std::abs(fmod(std::abs(particles[k].pos[0] - particle.pos[0]) + bounding_box/2, bounding_box) - bounding_box/2) - 2 * particles[k].radius;
+                // double dx;
+                // if (particles[k].pos[0] < particle.pos[0]) {
+                //     dx = particle.pos[0] - particles[k].pos[0] - 2 * particles[k].radius;
+                // }
+                // else {
+                //     dx = (particle.pos[0] + bounding_box) - particles[k].pos[0] - 2 * particles[k].radius;
+                // }
+
+                double colliding_times = dx/particles[k].v;
+                double x_ff_t = x_ff/particles[k].v;
+
+                // std::cout << colliding_times << " " << x_ff_t << std::endl;
+
+                int lifted_particle;
+                if (x_ff_t < colliding_times) { 
+                    colliding_times = x_ff_t;
+                    lifted_particle = prev_idx;
+                }
+                else {
+                    lifted_particle = next_idx;
+                }
+
+                if (colliding_times < tau_chain) {
+                    particles[k].move(particles[k].v * colliding_times);
+                    particles[k].pos[0] = fmod(particles[k].pos[0], bounding_box);
+
+                    particles[k].v = 0;
+                    k = lifted_particle;
+                    particles[k].v = 1;
+                }
+                else {
+                    particles[k].move(particles[k].v * tau_chain);
+                    particles[k].pos[0] = fmod(particles[k].pos[0], bounding_box);
+                }
+
+                events += 1;
+                tau_chain -= colliding_times;
+
+            }
+            event_count.push_back(events);
+            active_idx = k;
+            // for (int i = 0; i < particles.size(); i++) {
+            //     if (k == i) {
+            //         continue;
+            //     }
+            //     if (particles[k].is_collision(particles[i])) {
+            //         std::cout << "collided invalid" << std::endl;
+            //     }
+            // }
+
+            for (Particle &particle : particles) {
+                // x_pos.push_back(particle.pos[0]);
+                particle.accepted += 1;
+                particle.total += 1;
+                particle.v = 0;
+            }
+
+        }
+
+        void event_chain_ff_sequence_acc() {
+            std::random_device rd;
+            std::mt19937 generator(rd());
+            std::exponential_distribution<> dist_tau(1.0/400);
+
+            int k = active_idx;
+            particles[k].v = 1;
+            int events = 0;
+            double tau_chain = dist_tau(generator);
+
+            while (tau_chain > 0) {
+                std::exponential_distribution<> dist_ff(1/particles[k].h_i);
                 double x_ff = dist_ff(generator);
 
                 int next_idx = (k+1)%particles.size();
