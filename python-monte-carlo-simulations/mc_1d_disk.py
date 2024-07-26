@@ -149,6 +149,7 @@ class Simulation():
         self.populate_spawning(n_particles, 5, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
         self.active_idx = np.random.randint(0, len(self.particle_list))
         
+        self.particle_list[len(self.particle_list)-1].h_i = 250
 
     #print(particle_list)
     
@@ -171,7 +172,8 @@ class Simulation():
                     # init_x = bounding_box.left + (bounding_box.width/n * current_column) - radius
                     # init_y = bounding_box.top + (2.05 * radius * current_row) - radius
                     init_y = screen.get_height()/2
-                particle = Particle("red", radius, width=width, init_pos=pygame.Vector2(init_x, init_y), moveset=moveset, bounding_box=self.rect_value)
+                particle = Particle("red", radius, width=width, init_pos=pygame.Vector2(init_x, init_y), 
+                                    moveset=moveset, bounding_box=self.rect_value, h_i=self.mean)
                 for existing_particle in self.particle_list:
                     if particle.is_collision(existing_particle):
                         break
@@ -404,7 +406,9 @@ class Simulation():
             # sampled_u = np.random.uniform(0, 1)
             # P_T = np.random.exponential(1)
             # x_ff = -1/P_T * np.log(sampled_u)
-            x_ff = np.random.exponential(self.mean)
+            #x_ff = np.random.exponential(self.mean)
+            x_ff = np.random.exponential(particles[k].h_i)
+            
             #print(x_ff)
             
             # print("initial velocity", particles[k].v)

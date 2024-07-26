@@ -8,7 +8,7 @@ screen_height = 720
 
 class Particle():
     
-    def __init__(self, color, radius, width = 0, init_pos = [screen_width/2, screen_height/2], moveset = "normal", pbc = False, bounding_box = None) -> None:
+    def __init__(self, color, radius, width = 0, init_pos = [screen_width/2, screen_height/2], moveset = "normal", pbc = False, bounding_box = None, h_i = 0) -> None:
 
         self.color = color
         self.pos = init_pos
@@ -25,6 +25,7 @@ class Particle():
         self.theta = np.random.uniform(0, 2 * np.pi)
         self.v = 0.0
         self.delta = 10
+        self.h_i = h_i
 
         # this line is supposed to be an initial movement, but it doesn't actually move until you press R
         #self.check_valid_move(self.dx, self.dy)
@@ -35,7 +36,7 @@ class Particle():
     
     def is_collision(self, other_particle):
         distance = np.abs((self.pos[0] - other_particle.pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
-        return distance < self.radius + other_particle.radius and distance > 0
+        return distance < self.radius + other_particle.radius - 0.000000001 and distance > 0
             
     def propose_new_move(self):
         self.total += 1
@@ -91,14 +92,20 @@ class Simulation():
             self.sampling_method = self.event_chain_sequence
             moveset = "normal"
         elif sampling_method == "event_ff":
-            self.sampling_method = self.event_chain_ff_sequence
+            self.sampling_method = self.event_chain_ff_sequence_acc
             moveset = "normal"
 
         self.rect_value = bounding_box_size
 
         self.populate_spawning(n_particles, diameter/2, 3, bounding_box=self.rect_value, moveset=moveset, spawning_protocol=spawning_protocol)
-        print([particle.pos for particle in self.particle_list])
-        self.active_idx = np.random.randint(0, len(self.particle_list))
+        # print([particle.pos for particle in self.particle_list])
+        #self.active_idx = np.random.randint(0, len(self.particle_list))
+        self.active_idx = len(self.particle_list) - 1
+
+        self.particle_list[0].h_i = self.mean
+        
+        # for particle in self.particle_list:
+        #     print(particle.h_i)
         
 
     #print(particle_list)
@@ -119,7 +126,8 @@ class Simulation():
                 elif spawning_protocol == "uniform":
                     init_x = 0 + (2.05 * radius * current_column) - radius
                     # init_x = 0 + (bounding_box/n * current_column) - radius
-                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], moveset=moveset, bounding_box=self.rect_value)
+                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], h_i=len(self.particle_list)*DIAMETER,
+                                    moveset=moveset, bounding_box=self.rect_value)
                 for existing_particle in self.particle_list:
                     if particle.is_collision(existing_particle):
                         break
@@ -308,6 +316,8 @@ class Simulation():
         
         while tau_chain > 0:
             x_ff = np.random.exponential(self.mean)
+            #x_ff = np.random.exponential(particles[k].h_i)
+            
 
             next_idx = (k+1)%len(particles)
             prev_idx = (k-1)%len(particles)
@@ -326,7 +336,7 @@ class Simulation():
                 dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
 
             colliding_times = dx/particles[k].v
-
+            #print(colliding_times)
             # TODO: solve for x_ff_t
             x_ff_t = x_ff/particles[k].v
             
@@ -385,12 +395,110 @@ class Simulation():
             particle.accepted += 1
             particle.total += 1
             particle.v = 0
+    
+    def event_chain_ff_sequence_acc(self, particles):
+        k = self.active_idx
+        v = 1
+        # v = [1, 1]
+        particles[k].v = v
+        events = 0 
+        tau_chain = np.random.exponential(400)
+        # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
+        #print(P_T)
+        
+        while tau_chain > 0:
+            #x_ff = np.random.exponential(self.mean)
+            x_ff = np.random.exponential(particles[k].h_i)
+            # print(particles[k].h_i)
+            # print([particle.h_i for particle in particles])
+            
+
+            next_idx = (k+1)%len(particles)
+            prev_idx = (k-1)%len(particles)
+
+            # particle is the STATIONARY particle
+            particle = particles[next_idx]
+            # pairwise collision time collisions
+                
+            # pass collision time calculation for the same particle
+
+            # calculating collision times for PBC, if MOVING.x < STATIONARY.x, calculate normal
+            # else if MOVING.X > STATIONARY.x, meaning it would have to wrap around due to PBC, PRETEND next collision is in the next box over
+            if particles[k].pos[0] < particle.pos[0]:
+                dx = particle.pos[0] - particles[k].pos[0] - 2 * particles[k].radius
+            else:
+                dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
+
+            colliding_times = dx/particles[k].v
+            #print(colliding_times)
+            # TODO: solve for x_ff_t
+            x_ff_t = x_ff/particles[k].v
+            
+            # choose factor field or regular collision time, and pick lifting particle
+            # if ff, then next particle is i-1, if regular collision, next particle is i + 1
+            if x_ff_t < colliding_times:
+                colliding_times = x_ff_t
+                lifted_particle = prev_idx
+                # particles[lifted_particle].h_i = 0.9 * particles[k].h_i
+                # particles[k].h_i = self.mean
+            else:
+                lifted_particle = next_idx
+            
+
+            if colliding_times < tau_chain:
+                # move to collision
+                pdx = particles[k].v * colliding_times
+                #pdy = particles[k].v[1] * colliding_times
+                particles[k].move(pdx, 0)
+                valid, side = particles[k].check_valid_move()
+                if not valid:
+                    if side == 1:
+                        particles[k].move(-self.rect_value , 0)
+                        pdx += -self.rect_value
+
+                
+                # reset current particle velocity to 0
+                # update particle idx to the new particle
+                # update particle velocity 
+                particles[k].v = 0
+                k = lifted_particle
+                particles[k].v = v
+            else:
+                # move to x + v * tau_chain
+                pdx = particles[k].v * tau_chain
+                particles[k].move(pdx, 0)
+                valid, side = particles[k].check_valid_move()
+                if not valid:
+                    
+                    if side == 1:
+                        particles[k].move(-self.rect_value , 0)
+                        pdx += -self.rect_value 
+            
+            events += 1
+            tau_chain -= colliding_times
+            self.x_pos.append(particles[k].pos[0])
+            #time.sleep(2)
+
+            # # sanity check for collisions
+            # for idx, particle in enumerate(particles):
+            #     if particles[k].is_collision(particle):
+            #         print("COLLIDED INVALID")
+            #         print(particles[k].pos[0], particles[idx].pos[0])
+        self.active_idx = k
+        self.events.append(events)
+        # reset all velocities to zero
+        for particle in particles:
+            
+            particle.accepted += 1
+            particle.total += 1
+            particle.v = 0
 
     def simulate(self):
         print("Starting simulation.")
         count = 0
 
         tic = time.perf_counter()
+        self.mixing_times2()
         while count <= self.trials:
             
             # TODO: given n particles, choose one at random
@@ -401,7 +509,11 @@ class Simulation():
             self.sampling_method(particles=self.particle_list)
 
             count += 1
-            self.dt += 1
+
+            if count == 2:
+                for particle in self.particle_list:
+                    particle.h_i = self.mean
+            
             if count % 100000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
                 print(count)
@@ -428,7 +540,7 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 100_000
+N_TRIALS = 1_00_000
 SYSTEM_LENGTH = 400
 N_PARTICLES = 16
 DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
@@ -439,8 +551,14 @@ DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
 # ecmc = Simulation("event", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
 # e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
-e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+ecmc_ff_var_mix = []
+for i in range(0, 10):
+    print(i)
+    ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+    e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+    ecmc_ff_var_mix.append(ecmc_ff.var_mix)
+ecmc_ff_var_mix = np.mean(ecmc_ff_var_mix, axis=0)
+
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
@@ -449,7 +567,7 @@ e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 # 
 # markov.save_structure_factors("markov_sf_10m-120.csv")
 # ecmc.save_structure_factors("ecmc_sf_10m-2-py.csv")
-ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-16s-1.csv")
+# ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-16s-1.csv")
 # x_8 = np.linspace(0, np.sum(ecmc_ff.events)/16, len(e_ff_x_pos))
 # plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
 # plt.show()
@@ -484,23 +602,28 @@ ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-16s-1.csv")
 
 # plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
-# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
+plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
 
+plt.show()
+
+#final configuration of particles
 # plt.scatter(np.array(m_x_pos[-N_PARTICLES:]), [0 for i in range(N_PARTICLES)], 10, alpha=0.3, label="markov x")
 
 # plt.scatter(np.array(e_x_pos[-N_PARTICLES:]), [0.5 for i in range(N_PARTICLES)], 40, alpha=0.3, label="ecmc x")
 
-# plt.scatter(np.array(e_ff_x_pos[-N_PARTICLES:]), [0.7 for i in range(N_PARTICLES)], 40, alpha=0.3, label="ecmc ff x")
+plt.scatter(np.array(e_ff_x_pos[-N_PARTICLES:]), [0.7 for i in range(N_PARTICLES)], 40, alpha=0.3, label="ecmc ff x")
 
 
-# plt.legend()
-# plt.show()
+plt.legend()
+plt.show()
 
 # # structure factors
 # fig = plt.figure()
 # plt.plot([1 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+
+print(np.mean(ecmc_ff.structure_factors))
 
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
@@ -524,6 +647,17 @@ ecmc_ff.save_structure_factors("ecmc_ff_sf_var_10m-16s-1.csv")
 # plt.hist(np.array(e_y_pos) - 540, 40, density=True, histtype='step', label="ecmc y")
 
 # plt.xlim(0)
-# plt.legend()
+plt.legend()
 
-# plt.show()
+plt.show()
+
+# mixing times
+eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
+var_equil = (400-N_PARTICLES*DIAMETER)**2/(4*(N_PARTICLES+1))
+plt.plot(eff_x[:2000]/N_PARTICLES, np.array(ecmc_ff_var_mix[:2000])/var_equil)
+print(ecmc_ff.var_mix[0], np.mean(ecmc_ff_var_mix))
+plt.hlines(1, 0, 10, "black")
+
+plt.yscale('log')
+plt.xlim(0, 5)
+plt.show()
