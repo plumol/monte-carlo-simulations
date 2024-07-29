@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 1
+tick_speed = 10
 
 m = 250
 
@@ -286,7 +286,8 @@ class Simulation():
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
 
-        tau_chain = 400
+        # tau_chain = 400
+        tau_chain = np.random.exponential(10)
         while tau_chain > 0:
             # print("initial velocity", particles[k].v)
             # print("tau chain", tau_chain)
@@ -690,7 +691,7 @@ class Simulation():
             # check collisions and boundary conditions, if accept then move, if reject then don't move
             # update positions
             
-            # self.render()
+            self.render()
             count += 1
             
             self.sampling_method(particles=self.particle_list)
@@ -700,7 +701,7 @@ class Simulation():
                     particle.h_i = self.mean
 
             # renders the screen
-            # pygame.display.flip()
+            pygame.display.flip()
             #pygame.time.delay(1000)
 
             self.dt = 1 / 100
@@ -738,11 +739,11 @@ class Simulation():
 # markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
 # m_x_pos, m_y_pos = markov.simulate()
 
-# ecmc = Simulation("event", 500000, 400, n_particles=20, spawning_protocol="uniform")
-# e_x_pos, e_y_pos = ecmc.simulate()
+ecmc = Simulation("event", 500000, 400, n_particles=20, spawning_protocol="uniform")
+e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
-e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+# ecmc_ff = Simulation("event_ff", 10000, 400, n_particles=16, spawning_protocol="uniform")
+# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")

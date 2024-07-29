@@ -411,6 +411,7 @@ class Simulation():
         else:
         
             tau_chain = self.rect_value
+        # tau_chain = self.rect_value
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
@@ -540,10 +541,10 @@ class Simulation():
             #         for particle in self.particle_list:
             #             particle.h_i = self.mean
             #         swept = True
-            if count == 1:
-                for particle in self.particle_list:
-                    particle.h_i = self.mean
-                swept = True
+            # if count == 1:
+            #     for particle in self.particle_list:
+            #         particle.h_i = self.mean
+            #     swept = True
             
             if count % 50000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")

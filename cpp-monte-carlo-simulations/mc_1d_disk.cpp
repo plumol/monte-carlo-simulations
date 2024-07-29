@@ -142,7 +142,7 @@ class Simulation {
                     }
                     if (spawning_protocol == "uniform") {
                         // this is for side by side spawning
-                        init_x = (2.05 * radius * current_column) - radius;
+                        init_x = (2.001 * radius * current_column) - radius;
                     }
                     std::vector<double> init_position({init_x, 0.0});
                     Particle particle(radius, init_position, moveset, bounding_box, (particles.size()+1)*radius*2);
@@ -406,10 +406,17 @@ class Simulation {
             int k = active_idx;
             particles[k].v = 1;
             int events = 0;
-            double tau_chain = dist_tau(generator);
+            double tau_chain;
+
+            if (event_count.size() < 1) {
+                tau_chain = bounding_box*(particles.size() + 1)/4.0;
+            }
+            else {
+                tau_chain = bounding_box;
+            }
 
             while (tau_chain > 0) {
-                std::exponential_distribution<> dist_ff(1/particles[k].h_i);
+                std::exponential_distribution<> dist_ff(1.0/particles[k].h_i);
                 double x_ff = dist_ff(generator);
 
                 int next_idx = (k+1)%particles.size();
@@ -445,6 +452,7 @@ class Simulation {
                     particles[k].pos[0] = fmod(particles[k].pos[0], bounding_box);
 
                     particles[k].v = 0;
+                    particles[k].h_i = mean;
                     k = lifted_particle;
                     particles[k].v = 1;
                 }
@@ -469,7 +477,7 @@ class Simulation {
             // }
 
             for (Particle &particle : particles) {
-                // x_pos.push_back(particle.pos[0]);
+                //x_pos.push_back(particle.pos[0]);
                 particle.accepted += 1;
                 particle.total += 1;
                 particle.v = 0;
@@ -484,6 +492,7 @@ class Simulation {
             std::mt19937 generator(rd());
             std::uniform_int_distribution<> distribution(0, 20);
 
+            calculate_var_u();
             auto t1 = std::chrono::high_resolution_clock::now();
 
             // for (Particle particle : particles) {
@@ -492,7 +501,7 @@ class Simulation {
             while (count < trials) {
                 // sampling_method(particles=particle_list);
 
-                event_chain_ff_sequence();
+                event_chain_ff_sequence_acc();
                 count += 1;
 
                 if (count % 100000 == 0) {
@@ -528,11 +537,14 @@ int main(int argc, char *argv[]) {
     double DIAMETER = 400.0/(2*N_PARTICLES);
     std::cout << DIAMETER << " " << DIAMETER/2 << std::endl;
     std::cout << argv[1] << std::endl;
+    
+    // arg1 = n particles, arg2 = iteration
     std::string arg1(argv[1]);
+    std::string arg2(argv[2]);
 
     Simulation markov("markov", N_TRIALS, 400, N_PARTICLES, DIAMETER, "uniform");
     markov.simulate();
     // markov.save_positions("ecmc_sf_10m-100.csv");
-    markov.save_structure_factors("ecmc_ff_sf_10m-" + arg1 + ".csv");
+    markov.save_structure_factors("var_runs/" + arg1 + "/ecmc_ff_sf_10m-" + arg1+ "-" + arg2 + ".csv");
 
 }
