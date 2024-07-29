@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 10
+tick_speed = 1
 
 m = 250
 
@@ -39,14 +39,10 @@ class Particle(pygame.Rect):
 
     def move(self, pdx, pdy, reset = False):
 
-        if self.moveset == "normal":
-            self.pos.x += pdx
-            self.pos.y += pdy
-        elif self.moveset == "random" or reset:
-            self.pos.x = pdx
-            self.pos.y = pdy
+        self.pos.x += pdx
+        self.pos.y += pdy
 
-        pass
+        
 
     def render(self, type=None):
         """
@@ -66,8 +62,12 @@ class Particle(pygame.Rect):
             pygame.draw.circle(screen, self.color, self.pos, self.radius, self.width)
     
     def is_collision(self, other_particle):
-        distance = np.sqrt((self.pos.x - other_particle.pos.x)**2 + (self.pos.y - other_particle.pos.y)**2)
-        return distance < self.radius + other_particle.radius and distance > 0
+        # distance = np.sqrt((self.pos.x - other_particle.pos.x)**2 + (self.pos.y - other_particle.pos.y)**2)
+        # return distance < self.radius + other_particle.radius and distance > 0
+    
+        distance = np.abs((self.pos[0] - other_particle.pos[0] + self.bounding_box.width/2)%self.bounding_box.width - self.bounding_box.width/2)
+        return distance < self.radius + other_particle.radius - 0.000000001 and distance > 0
+
             
     def propose_new_move(self):
         if self.moveset == "normal":
@@ -408,7 +408,7 @@ class Simulation():
         else:
             tau_chain = self.rect_value.width
         # tau_chain = 400
-        print(tau_chain)
+        print("tau chain", tau_chain)
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
@@ -438,24 +438,24 @@ class Simulation():
             # calculating collision times for PBC, if MOVING.x < STATIONARY.x, calculate normal
             # else if MOVING.X > STATIONARY.x, meaning it would have to wrap around due to PBC, PRETEND next collision is in the next box over
             if particles[k].pos.x < particle.pos.x:
-                dx = particle.pos.x - particles[k].pos.x
+                dx = particle.pos.x - particles[k].pos.x - 2 * particles[k].radius
             else:
-                dx = (particle.pos.x + self.rect_value.width)  - particles[k].pos.x
+                dx = (particle.pos.x + self.rect_value.width)  - particles[k].pos.x - 2 * particles[k].radius
 
-            dy = particle.pos.y - particles[k].pos.y
+            # dy = particle.pos.y - particles[k].pos.y
 
-            a = (particles[k].v[0]**2 + particles[k].v[1]**2)
-            b = 2 * -( particles[k].v[0] * dx + particles[k].v[1] * dy)
-            c = dx**2 + dy**2 - (particle.radius + particles[k].radius)**2
+            # a = (particles[k].v[0]**2 + particles[k].v[1]**2)
+            # b = 2 * -( particles[k].v[0] * dx + particles[k].v[1] * dy)
+            # c = dx**2 + dy**2 - (particle.radius + particles[k].radius)**2
 
-            # if discriminant < 0, no real roots and no collisions, default is already set to inf
-            if b**2 - 4 * a * c < 0:
-                colliding_times = float("inf")
-            # quadratic equation
-            else:
-                t_1 = (-b + np.sqrt(b**2 -4 * a * c))/(2*a)
-                t_2 = (-b - np.sqrt(b**2 -4 * a * c))/(2*a)
-                colliding_times = min((t for t in (t_1, t_2) if t >= 0), default=float("inf"))
+            # # if discriminant < 0, no real roots and no collisions, default is already set to inf
+            # if b**2 - 4 * a * c < 0:
+            #     colliding_times = float("inf")
+            # # quadratic equation
+            # else:
+            #     t_1 = (-b + np.sqrt(b**2 -4 * a * c))/(2*a)
+            #     t_2 = (-b - np.sqrt(b**2 -4 * a * c))/(2*a)
+            #     colliding_times = min((t for t in (t_1, t_2) if t >= 0), default=float("inf"))
 
             #print(a, b, c)
             # print(t1, t2)
@@ -469,6 +469,7 @@ class Simulation():
             # check minimum collding time > 0 
 
             # TODO: solve for x_ff_t
+            colliding_times = dx/particles[k].v[0]
             x_ff_t = x_ff/particles[k].v[0]
             #print(x_ff_t, colliding_times)
             #print("hi")
@@ -482,7 +483,7 @@ class Simulation():
             
             # print("min_collide", min_colliding_time)
             #print(colliding_times)
-            print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0])
+            print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0] - 1280/4, particles[k].pos[0] + colliding_times - 1280/4)
 
             if colliding_times < tau_chain:
                 # move to collision
@@ -499,7 +500,11 @@ class Simulation():
                         particles[k].move(-self.rect_value.width , 0)
                         pdx += -self.rect_value.width
 
-                
+                screen.fill("white")
+                self.render()
+                pygame.display.flip()
+                # self.render()
+                # pygame.display.flip()
                 # reset current particle velocity to 0
                 # update particle idx to the new particle
                 # update particle velocity 
@@ -518,11 +523,13 @@ class Simulation():
                     if side == 1:
                         particles[k].move(-self.rect_value.width , 0)
                         pdx += -self.rect_value.width 
+                screen.fill("white")
+                self.render()
+                pygame.display.flip()
                 
             tau_chain -= colliding_times
             events+=1
-            self.render()
-            pygame.display.flip()
+            
 
             # # sanity check for collisions
             # for idx, particle in enumerate(particles):
@@ -675,12 +682,16 @@ class Simulation():
         count = 0
 
         tic = time.perf_counter()
+
         while self.running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            screen.fill("white")
+            # screen.fill("white")
+            # self.render()
+            # pygame.display.flip()
+
             
             #bounding_box = pygame.draw.rect(screen, "black", self.rect_value, 1)
             
@@ -691,7 +702,7 @@ class Simulation():
             # check collisions and boundary conditions, if accept then move, if reject then don't move
             # update positions
             
-            self.render()
+
             count += 1
             
             self.sampling_method(particles=self.particle_list)
@@ -701,7 +712,6 @@ class Simulation():
                     particle.h_i = self.mean
 
             # renders the screen
-            pygame.display.flip()
             #pygame.time.delay(1000)
 
             self.dt = 1 / 100
@@ -739,11 +749,11 @@ class Simulation():
 # markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
 # m_x_pos, m_y_pos = markov.simulate()
 
-ecmc = Simulation("event", 500000, 400, n_particles=20, spawning_protocol="uniform")
-e_x_pos, e_y_pos = ecmc.simulate()
+# ecmc = Simulation("event", 2, 400, n_particles=20, spawning_protocol="uniform")
+# e_x_pos, e_y_pos = ecmc.simulate()
 
-# ecmc_ff = Simulation("event_ff", 10000, 400, n_particles=16, spawning_protocol="uniform")
-# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
+e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")

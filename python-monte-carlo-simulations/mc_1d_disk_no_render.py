@@ -453,7 +453,7 @@ class Simulation():
             else:
                 lifted_particle = next_idx
             
-            #print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0], particles[k].pos[0] + colliding_times)
+            # print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0], particles[k].pos[0] + colliding_times)
 
             if colliding_times < tau_chain:
                 # move to collision
@@ -471,7 +471,7 @@ class Simulation():
                 # update particle idx to the new particle
                 # update particle velocity 
                 particles[k].v = 0
-                particles[k].h_i = self.mean
+                #particles[k].h_i = self.mean
                 k = lifted_particle
                 particles[k].v = v
             else:
@@ -541,10 +541,10 @@ class Simulation():
             #         for particle in self.particle_list:
             #             particle.h_i = self.mean
             #         swept = True
-            # if count == 1:
-            #     for particle in self.particle_list:
-            #         particle.h_i = self.mean
-            #     swept = True
+            if count == 1:
+                for particle in self.particle_list:
+                    particle.h_i = self.mean
+                #swept = True
             
             if count % 50000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
@@ -643,9 +643,9 @@ ecmc_ff_events = np.mean(ecmc_ff_events, axis=0)
 
 # plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
 
-# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
+plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
 
-# plt.show()
+plt.show()
 
 #final configuration of particles
 # plt.scatter(np.array(m_x_pos[-N_PARTICLES:]), [0 for i in range(N_PARTICLES)], 10, alpha=0.3, label="markov x")
