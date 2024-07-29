@@ -417,7 +417,6 @@ class Simulation():
         
         while tau_chain > 0:
             #x_ff = np.random.exponential(self.mean)
-            x_ff = np.random.exponential(particles[k].h_i)
             # print(particles[k].h_i)
             # print([particle.h_i for particle in particles])
             
@@ -437,12 +436,21 @@ class Simulation():
                 dx = particle.pos[0] - particles[k].pos[0] - 2 * particles[k].radius
             else:
                 dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
+            
+            
+            try:
+                h = max(dx-particles[k].radius*2, self.mean)
+                #print(h)
+                x_ff = np.random.exponential(h)
+            except:
+                print("EXP BROKE", dx)
 
             colliding_times = dx/particles[k].v
             #print(colliding_times)
             # TODO: solve for x_ff_t
             x_ff_t = x_ff/particles[k].v
             
+            #print(colliding_times, x_ff)
             # choose factor field or regular collision time, and pick lifting particle
             # if ff, then next particle is i-1, if regular collision, next particle is i + 1
             if x_ff_t < colliding_times:
@@ -541,9 +549,9 @@ class Simulation():
             #         for particle in self.particle_list:
             #             particle.h_i = self.mean
             #         swept = True
-            if count == 1:
-                for particle in self.particle_list:
-                    particle.h_i = self.mean
+            # if count == 1:
+            #     for particle in self.particle_list:
+            #         particle.h_i = self.mean
                 #swept = True
             
             if count % 50000 == 0:
@@ -655,10 +663,12 @@ step = 0
 plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*step:N_PARTICLES*(step+1)]), [0.7 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
 plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +1):N_PARTICLES*(step+2)]), [0.701 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
 plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +2):N_PARTICLES*(step+3)]), [0.702 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
+plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +3):N_PARTICLES*(step+4)]), [0.703 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
+plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +4):N_PARTICLES*(step+5)]), [0.704 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
 
 
 plt.xlim(0, 400)
-plt.legend()
+# plt.legend()
 plt.show()
 
 # # structure factors
@@ -667,7 +677,7 @@ plt.show()
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
 plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
 
-print(np.mean(ecmc_ff.structure_factors), np.mean(ecmc_ff.events))
+print(np.mean(ecmc_ff.structure_factors), np.mean(ecmc_ff.events), ecmc_ff_events[0:5])
 
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
@@ -711,12 +721,12 @@ plt.plot(eff_x[:2000]/N_PARTICLES, np.array(ecmc_ff_var_mix[:2000])/var_equil, l
 
 print(mixed_time, ecmc_ff_var_mix[mixed_time-1]/var_equil)
 
-print(ecmc_ff.var_mix[0], np.mean(ecmc_ff_var_mix))
+print(ecmc_ff.var_mix[0], np.mean(ecmc_ff_var_mix)/var_equil)
 # plt.vlines((mixed_time-1)*np.mean(ecmc_ff_events)/N_PARTICLES**2, 0, 10, "black")
 plt.hlines(1, 0, 10, "black")
 #print(np.mean(np.array(ecmc_ff_var_mix[:N_PARTICLES**2])/var_equil))
 
 plt.legend()
 plt.yscale('log')
-plt.xlim(0, 5)
+plt.xlim(0, 100)
 plt.show()
