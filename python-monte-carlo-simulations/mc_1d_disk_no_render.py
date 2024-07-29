@@ -439,9 +439,9 @@ class Simulation():
             
             
             try:
-                h = max(dx-particles[k].radius*2, self.mean)
+                h = max(dx, self.mean)
                 #print(h)
-                x_ff = np.random.exponential(h)
+                x_ff = np.random.exponential(self.mean)
             except:
                 print("EXP BROKE", dx)
 
@@ -527,6 +527,8 @@ class Simulation():
 
         tic = time.perf_counter()
         self.mixing_times2()
+        self.structure_factor()
+        self.events.append(0)
         while count <= self.trials:
             
             # TODO: given n particles, choose one at random
@@ -706,12 +708,18 @@ plt.legend()
 plt.show()
 
 eff_base_df = pd.read_csv("ecmc_ff_16_base-2.csv")
+eff_base_df["events"] = eff_base_df["events"].shift(1)
+eff_base_df["events"][0] = 0
 eff_base_mix = np.array(eff_base_df["var_mix"].to_list())
 eff_base_events = np.array(eff_base_df["events"].to_list())
 
+
 # mixing times
-eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
-eff_x_base = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(eff_base_events)/16
+# eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
+# eff_x_base = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(eff_base_events)/16
+eff_x = np.cumsum(ecmc_ff.events)/N_PARTICLES
+eff_x_base = np.cumsum(eff_base_events)/16
+
 
 var_equil = (400-N_PARTICLES*DIAMETER)**2/(4*(N_PARTICLES+1))
 var_equil_16 = (400-16*(SYSTEM_LENGTH/(2*16)))**2/(4*(16+1))
@@ -728,5 +736,5 @@ plt.hlines(1, 0, 10, "black")
 
 plt.legend()
 plt.yscale('log')
-plt.xlim(0, 100)
+plt.xlim(0, 2)
 plt.show()

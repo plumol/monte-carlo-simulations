@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 1
+tick_speed = 10
 
 m = 250
 
@@ -286,7 +286,7 @@ class Simulation():
         # v = [1, 1]
         particles[k].v[0], particles[k].v[1] = v[0], 0
 
-        # tau_chain = 400
+        #tau_chain = 400
         tau_chain = np.random.exponential(10)
         while tau_chain > 0:
             # print("initial velocity", particles[k].v)
@@ -378,7 +378,7 @@ class Simulation():
                         pdx += -self.rect_value.width 
             
             tau_chain -= colliding_times
-            print(tau_chain)
+            #print(tau_chain)
 
             # sanity check for collisions
             # for idx, particle in enumerate(particles):
@@ -688,9 +688,9 @@ class Simulation():
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            # screen.fill("white")
-            # self.render()
-            # pygame.display.flip()
+            screen.fill("white")
+            self.render()
+            pygame.display.flip()
 
             
             #bounding_box = pygame.draw.rect(screen, "black", self.rect_value, 1)
@@ -749,11 +749,11 @@ class Simulation():
 # markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
 # m_x_pos, m_y_pos = markov.simulate()
 
-# ecmc = Simulation("event", 2, 400, n_particles=20, spawning_protocol="uniform")
-# e_x_pos, e_y_pos = ecmc.simulate()
+ecmc = Simulation("event", 10000, 400, n_particles=20, spawning_protocol="uniform")
+e_x_pos, e_y_pos = ecmc.simulate()
 
-ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
-e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+# ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
+# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
