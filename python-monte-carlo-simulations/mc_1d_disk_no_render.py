@@ -74,6 +74,7 @@ class Simulation():
         self.structure_factors = []
         self.events = []
         self.var_mix = []
+        self.moves = []
 
         self.dt = 0
         self.running = True
@@ -102,7 +103,7 @@ class Simulation():
         #self.active_idx = np.random.randint(0, len(self.particle_list))
         self.active_idx = len(self.particle_list) - 1
 
-        self.particle_list[0].h_i = self.mean
+        #self.particle_list[0].h_i = self.mean
         
         total_h_i = 0
         for particle in self.particle_list:
@@ -127,11 +128,11 @@ class Simulation():
                     init_x = np.random.uniform(0 + radius + 0.1, bounding_box - radius - 0.1)
                     # init_y  = np.random.uniform(bounding_box.top + radius + 0.1, bounding_box.bottom - radius - 0.1)
                 elif spawning_protocol == "uniform":
-                    init_x = 0 + (2.001 * radius * current_column) - radius
+                    init_x = 0 + (2.000000001 * radius * current_column) - radius
                     #init_x = 0 + (bounding_box/n * current_column) - radius
-                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], h_i=(len(self.particle_list)+1)*DIAMETER,
+                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], h_i=2*self.mean,
                                     moveset=moveset, bounding_box=self.rect_value)
-                #h_i=len(self.particle_list)*DIAMETER+radius
+                #h_i=(len(self.particle_list)+1)*DIAMETER
                 for existing_particle in self.particle_list:
                     if particle.is_collision(existing_particle):
                         break
@@ -406,17 +407,18 @@ class Simulation():
         # v = [1, 1]
         particles[k].v = v
         events = 0 
-        if len(self.events) < 1:
-            tau_chain = self.rect_value*(len(particles) + 1)/4
-        else:
-        
-            tau_chain = self.rect_value
-        # tau_chain = self.rect_value
+        a = "collision"
+        # if len(self.events) < 2:
+        #     tau_chain = self.rect_value*(len(particles) + 1)/4
+        # else:
+        #     tau_chain = self.rect_value
+        tau_chain = self.rect_value
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
         while tau_chain > 0:
             #x_ff = np.random.exponential(self.mean)
+            x_ff = np.random.exponential(particles[k].h_i)
             # print(particles[k].h_i)
             # print([particle.h_i for particle in particles])
             
@@ -436,14 +438,21 @@ class Simulation():
                 dx = particle.pos[0] - particles[k].pos[0] - 2 * particles[k].radius
             else:
                 dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
+
+            # front_dist = np.abs((particles[k].pos[0] - particle.pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
+            # back_dist = np.abs((particles[k].pos[0] - particles[prev_idx].pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
+            # middx = (front_dist + back_dist)/2
+
+            # x_ff = np.random.exponential(middx)
+            # calculate distance with (i, i-1)
             
             
-            try:
-                h = max(dx, self.mean)
-                #print(h)
-                x_ff = np.random.exponential(self.mean)
-            except:
-                print("EXP BROKE", dx)
+            # try:
+            #     h = max(dx-particles[k].radius*2, self.mean)
+            #     #print(h)
+            #     x_ff = np.random.exponential(dx)
+            # except:
+            #     print("EXP BROKE", dx)
 
             colliding_times = dx/particles[k].v
             #print(colliding_times)
@@ -458,10 +467,12 @@ class Simulation():
                 lifted_particle = prev_idx
                 # particles[lifted_particle].h_i = 0.9 * particles[k].h_i
                 # particles[k].h_i = self.mean
+                a = "FF"
             else:
                 lifted_particle = next_idx
+                a = "COLLISION"
             
-            # print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0], particles[k].pos[0] + colliding_times)
+            #print(f"collide {a}", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0], particles[k].pos[0] + colliding_times)
 
             if colliding_times < tau_chain:
                 # move to collision
@@ -495,6 +506,7 @@ class Simulation():
             
             events += 1
             tau_chain -= colliding_times
+            #self.moves.append([particle.pos[0] for particle in particles])
             
             #time.sleep(2)
 
@@ -524,6 +536,7 @@ class Simulation():
 
         for particle in self.particle_list:
             self.x_pos.append(particle.pos[0])
+        self.moves.append([particle.pos[0] for particle in self.particle_list])
 
         tic = time.perf_counter()
         self.mixing_times2()
@@ -551,10 +564,10 @@ class Simulation():
             #         for particle in self.particle_list:
             #             particle.h_i = self.mean
             #         swept = True
-            # if count == 1:
-            #     for particle in self.particle_list:
-            #         particle.h_i = self.mean
-                #swept = True
+            if count == 1:
+                for particle in self.particle_list:
+                    particle.h_i = self.mean
+                swept = True
             
             if count % 50000 == 0:
                 print(f"Acceptance: {[particle.accepted/particle.total for particle in self.particle_list]}")
@@ -607,7 +620,8 @@ for i in range(0, 10):
 ecmc_ff_var_mix = np.mean(ecmc_ff_var_mix, axis=0)
 ecmc_ff_events = np.mean(ecmc_ff_events, axis=0)
 
-
+# moves_df = pd.DataFrame(ecmc_ff.moves)
+# moves_df.to_csv("accelerated_first_chain.csv")
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
 # ecmc.save_positions("test.csv")
@@ -717,7 +731,7 @@ eff_base_events = np.array(eff_base_df["events"].to_list())
 # mixing times
 # eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
 # eff_x_base = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(eff_base_events)/16
-eff_x = np.cumsum(ecmc_ff.events)/N_PARTICLES
+eff_x = np.cumsum(ecmc_ff_events)/N_PARTICLES
 eff_x_base = np.cumsum(eff_base_events)/16
 
 

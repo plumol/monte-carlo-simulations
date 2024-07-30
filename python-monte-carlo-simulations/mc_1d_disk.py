@@ -9,7 +9,7 @@ pygame.init()
 screen = pygame.display.set_mode((1280, 720))
 clock = pygame.time.Clock()
 dt = 0
-tick_speed = 10
+tick_speed = 0.5
 
 m = 250
 
@@ -483,7 +483,7 @@ class Simulation():
             
             # print("min_collide", min_colliding_time)
             #print(colliding_times)
-            print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0] - 1280/4, particles[k].pos[0] + colliding_times - 1280/4)
+            print("collide ", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0] - self.rect_value.left, particles[k].pos[0] + colliding_times - self.rect_value.left)
 
             if colliding_times < tau_chain:
                 # move to collision
@@ -500,9 +500,9 @@ class Simulation():
                         particles[k].move(-self.rect_value.width , 0)
                         pdx += -self.rect_value.width
 
-                screen.fill("white")
-                self.render()
-                pygame.display.flip()
+                # screen.fill("white")
+                # self.render()
+                # pygame.display.flip()
                 # self.render()
                 # pygame.display.flip()
                 # reset current particle velocity to 0
@@ -523,10 +523,14 @@ class Simulation():
                     if side == 1:
                         particles[k].move(-self.rect_value.width , 0)
                         pdx += -self.rect_value.width 
-                screen.fill("white")
-                self.render()
-                pygame.display.flip()
-                
+                # screen.fill("white")
+                # self.render()
+                # pygame.display.flip()
+            
+            screen.fill("white")
+            self.render()
+            pygame.display.flip()
+
             tau_chain -= colliding_times
             events+=1
             
@@ -688,9 +692,6 @@ class Simulation():
                 if event.type == pygame.QUIT:
                     self.running = False
 
-            screen.fill("white")
-            self.render()
-            pygame.display.flip()
 
             
             #bounding_box = pygame.draw.rect(screen, "black", self.rect_value, 1)
@@ -706,6 +707,11 @@ class Simulation():
             count += 1
             
             self.sampling_method(particles=self.particle_list)
+
+            screen.fill("white")
+            self.render()
+            pygame.display.flip()
+
 
             if count == 1:
                 for particle in self.particle_list:
@@ -749,11 +755,11 @@ class Simulation():
 # markov = Simulation("markov", 100000, 400, n_particles=4, spawning_protocol="uniform")
 # m_x_pos, m_y_pos = markov.simulate()
 
-ecmc = Simulation("event", 10000, 400, n_particles=20, spawning_protocol="uniform")
-e_x_pos, e_y_pos = ecmc.simulate()
+# ecmc = Simulation("event", 2, 400, n_particles=20, spawning_protocol="uniform")
+# e_x_pos, e_y_pos = ecmc.simulate()
 
-# ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
-# e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
+ecmc_ff = Simulation("event_ff", 2, 400, n_particles=16, spawning_protocol="uniform")
+e_ff_x_pos, e_ff_y_pos = ecmc_ff.simulate()
 
 # SAVING
 # markov.save_positions("markov_sampling_1mil-0620.csv")
