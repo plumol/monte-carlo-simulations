@@ -130,7 +130,7 @@ class Simulation():
                 elif spawning_protocol == "uniform":
                     init_x = 0 + (2.000000001 * radius * current_column) - radius
                     #init_x = 0 + (bounding_box/n * current_column) - radius
-                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], h_i=2*self.mean,
+                particle = Particle("red", radius, width=width, init_pos=[init_x, 0], h_i=n/2 * self.mean,
                                     moveset=moveset, bounding_box=self.rect_value)
                 #h_i=(len(self.particle_list)+1)*DIAMETER
                 for existing_particle in self.particle_list:
@@ -315,13 +315,14 @@ class Simulation():
         # v = [1, 1]
         particles[k].v = v
         events = 0 
-        tau_chain = np.random.exponential(10)
+        #tau_chain = np.random.exponential(10)
+        tau_chain = self.rect_value
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
         while tau_chain > 0:
             #x_ff = np.random.exponential(self.mean)
-            x_ff = np.random.exponential(particles[k].h_i)
+            x_ff = np.random.exponential(self.mean)
             
 
             next_idx = (k+1)%len(particles)
@@ -439,8 +440,8 @@ class Simulation():
             else:
                 dx = (particle.pos[0] + self.rect_value) - particles[k].pos[0] - 2 * particles[k].radius
 
-            # front_dist = np.abs((particles[k].pos[0] - particle.pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
-            # back_dist = np.abs((particles[k].pos[0] - particles[prev_idx].pos[0] + self.bounding_box/2)%self.bounding_box - self.bounding_box/2)
+            # front_dist = np.abs((particles[k].pos[0] - particle.pos[0] + self.rect_value/2)%self.rect_value - self.rect_value/2)
+            # back_dist = np.abs((particles[k].pos[0] - particles[prev_idx].pos[0] + self.rect_value/2)%self.rect_value - self.rect_value/2)
             # middx = (front_dist + back_dist)/2
 
             # x_ff = np.random.exponential(middx)
@@ -564,7 +565,7 @@ class Simulation():
             #         for particle in self.particle_list:
             #             particle.h_i = self.mean
             #         swept = True
-            if count == 1:
+            if count == (N_PARTICLES*self.rect_value/4)/self.rect_value:
                 for particle in self.particle_list:
                     particle.h_i = self.mean
                 swept = True
@@ -595,7 +596,7 @@ class Simulation():
 # plt.xticks(x_ticks)
 # plt.yticks(y_ticks)
 
-N_TRIALS = 50_000
+N_TRIALS = 25_000
 SYSTEM_LENGTH = 400
 N_PARTICLES = 16
 DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
@@ -611,14 +612,17 @@ var_equil = (400-N_PARTICLES*DIAMETER)**2/(4*(N_PARTICLES+1))
 # run loop
 ecmc_ff_var_mix = []
 ecmc_ff_events = []
+ecmc_ff_sf = []
 for i in range(0, 10):
     print(i)
     ecmc_ff = Simulation("event_ff", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
     e_ff_x_pos, e_ff_y_pos, mixed_time = ecmc_ff.simulate()
     ecmc_ff_var_mix.append(ecmc_ff.var_mix)
     ecmc_ff_events.append(ecmc_ff.events)
+    ecmc_ff_sf.append(ecmc_ff.structure_factors)
 ecmc_ff_var_mix = np.mean(ecmc_ff_var_mix, axis=0)
 ecmc_ff_events = np.mean(ecmc_ff_events, axis=0)
+ecmc_ff_sf = np.mean(ecmc_ff_sf, axis=0)
 
 # moves_df = pd.DataFrame(ecmc_ff.moves)
 # moves_df.to_csv("accelerated_first_chain.csv")
@@ -634,7 +638,7 @@ ecmc_ff_events = np.mean(ecmc_ff_events, axis=0)
 # plt.plot(np.array(e_ff_x_pos[:3000])-SYSTEM_LENGTH/2, x_8[:3000])
 # plt.show()
 
-# df = pd.DataFrame(zip(ecmc_ff_var_mix, ecmc_ff_events), columns=["var_mix", "events"])
+# df = pd.DataFrame(zip(ecmc_ff_var_mix, ecmc_ff_events, ecmc_ff_sf), columns=["var_mix", "events", "sf"])
 # df.to_csv("ecmc_ff_16_c-4.csv")
 
 # load saved CSV files
@@ -687,12 +691,20 @@ plt.xlim(0, 400)
 # plt.legend()
 plt.show()
 
+eff_base_df = pd.read_csv("ecmc_ff_16_base-2.csv")
+eff_base_df["events"] = eff_base_df["events"].shift(1)
+eff_base_df["events"][0] = 0
+eff_base_mix = np.array(eff_base_df["var_mix"].to_list())
+eff_base_events = np.array(eff_base_df["events"].to_list())
+eff_base_sf = np.array(eff_base_df['sf'])
+
 # # structure factors
 # fig = plt.figure()
 # plt.plot([1 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
-
+# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+plt.hist(np.array(ecmc_ff.structure_factors), 40, histtype='step', label="test")
+plt.hist(np.array())
 print(np.mean(ecmc_ff.structure_factors), np.mean(ecmc_ff.events), ecmc_ff_events[0:5])
 
 # after loading SF!
@@ -721,11 +733,6 @@ plt.legend()
 
 plt.show()
 
-eff_base_df = pd.read_csv("ecmc_ff_16_base-2.csv")
-eff_base_df["events"] = eff_base_df["events"].shift(1)
-eff_base_df["events"][0] = 0
-eff_base_mix = np.array(eff_base_df["var_mix"].to_list())
-eff_base_events = np.array(eff_base_df["events"].to_list())
 
 
 # mixing times
