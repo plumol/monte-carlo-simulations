@@ -82,11 +82,13 @@ class Simulation {
         int active_idx;
         int n_particles;
         int diameter;
+        bool OPTIMAL_PHASE;
         
         std::vector<double> structure_factors;
         std::vector<double> x_pos;
         std::vector<int> event_count;
         std::vector<double> var_mix;
+        std::vector<double> random_his;
 
         void (*sampling_function) = nullptr;
 
@@ -96,12 +98,14 @@ class Simulation {
             this->mean = (bounding_box_size - n_particles*diameter)/n_particles;
             this->n_particles = n_particles;
             this->diameter = diameter;
+            this-> OPTIMAL_PHASE = false;
 
             event_count.reserve(trials);
             x_pos.reserve(trials * particles.size());
             structure_factors.reserve(trials);
             var_mix.reserve(trials);
             particles.reserve(n_particles);
+            random_his.reserve(trials);
             
 
             // init random idx for FF
@@ -216,13 +220,49 @@ class Simulation {
             var_mix.push_back(variance);
         }
 
+        double calculate_random_hi() {
+            std::vector<double> dis;
+            dis.assign(n_particles, 0.0);
+
+            for (int i = 0; i < n_particles; i++) {
+                int next_idx = (i+1)%n_particles;
+
+                double di = particles[next_idx].pos[0] - particles[i].pos[0] - diameter;
+
+                if (particles[next_idx].pos[0] < particles[i].pos[0]) {
+                    di += bounding_box;
+                }
+                dis[i] = di;
+            }
+
+            double dis_2 = 0;
+            double dis2 = 0;
+
+            for (double di: dis) {
+                dis_2 += di;
+            }
+            dis_2 /= n_particles;
+            dis_2 = pow(dis_2, 2);
+
+            for (double di: dis) {
+                dis2 += pow(di, 2);
+            }
+            dis2 /= n_particles;
+
+            double random_hi = sqrt(abs(dis_2 - dis2));
+            random_his.push_back(random_hi);
+
+            return random_hi;
+        }
+
         void save_structure_factors(std::string file_name) {
             std::ofstream output_file(file_name);
-            output_file << "sf,events,var_mix\n";
+            output_file << "sf,events,var_mix,his\n";
             //std::ostream_iterator<double> output_iterator(output_file, ",\n");
             //std::copy(std::begin(structure_factors), std::end(structure_factors), output_iterator);
             for (int i = 0; i < structure_factors.size(); i++) {
-                output_file << structure_factors[i] << "," << event_count[i] << "," << var_mix[i] << std::endl;
+                output_file << structure_factors[i] << "," << event_count[i] << "," << var_mix[i] 
+                << "," << random_his[i] << std::endl;
             }
         }
 
@@ -417,9 +457,17 @@ class Simulation {
             // else {
             //     tau_chain = bounding_box;
             // }
-
+            double hi;
+            if (OPTIMAL_PHASE) {
+                hi = mean;
+            }
+            else {
+                hi = calculate_random_hi();
+            }
+            
             while (tau_chain > 0) {
-                std::exponential_distribution<> dist_ff(1.0/particles[k].h_i);
+                //std::exponential_distribution<> dist_ff(1.0/particles[k].h_i);
+                std::exponential_distribution<> dist_ff(1.0/hi);
                 double x_ff = dist_ff(generator);
 
                 int next_idx = (k+1)%particles.size();
@@ -498,6 +546,7 @@ class Simulation {
             calculate_var_u();
             calculate_structure_factor();
             event_count.push_back(0);
+            calculate_random_hi();
 
             auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -513,6 +562,7 @@ class Simulation {
                         for (Particle &particle : particles) {
                                 particle.h_i = mean;
                         }
+                        OPTIMAL_PHASE = true;
                 }
 
 
