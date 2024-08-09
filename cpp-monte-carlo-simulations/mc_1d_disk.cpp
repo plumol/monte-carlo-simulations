@@ -112,10 +112,12 @@ class Simulation {
             populate_spawning(n_particles, diameter/2, bounding_box_size, "random", spawning_protocol);
             // std::cout << "Initialized particle list" << std::endl;
             // std::cout << particles.size() << std::endl;
-            for (Particle &particle : particles) {
-                std::vector<double> positions = particle.get_positions();
-                std::cout << positions[0] << std::endl;
-            }
+            
+            // checking positions
+            // for (Particle &particle : particles) {
+            //     std::vector<double> positions = particle.get_positions();
+            //     std::cout << positions[0] << std::endl;
+            // }
             std::cout << "NUM PARTICLES " << particles.size() << std::endl;
 
             std::random_device rd;
@@ -145,7 +147,7 @@ class Simulation {
                         init_x = (2.001 * radius * current_column) - radius;
                     }
                     std::vector<double> init_position({init_x, 0.0});
-                    Particle particle(radius, init_position, moveset, bounding_box, (particles.size()+1)*radius*2);
+                    Particle particle(radius, init_position, moveset, bounding_box, mean);
 
                     bool add = true;
                     for (Particle &existing_particle : particles) {
@@ -295,9 +297,6 @@ class Simulation {
 
                 events += 1;
                 tau_chain -= colliding_times;
-                // std::cout << tau_chain << std::endl;
-
-                // std::this_thread::sleep_for(std::chrono::seconds(1));
                 
             }
             
@@ -327,7 +326,11 @@ class Simulation {
             int k = active_idx;
             particles[k].v = 1;
             int events = 0;
-            double tau_chain = dist_tau(generator);
+            // random expo chain(10)
+            //double tau_chain = dist_tau(generator);
+            
+            // tau_chain = L
+            double tau_chain = bounding_box;
 
             while (tau_chain > 0) {
                 std::exponential_distribution<> dist_ff(1/mean);
@@ -406,14 +409,14 @@ class Simulation {
             int k = active_idx;
             particles[k].v = 1;
             int events = 0;
-            double tau_chain;
+            double tau_chain = bounding_box;
 
-            if (event_count.size() < 1) {
-                tau_chain = bounding_box*(particles.size() + 1)/4.0;
-            }
-            else {
-                tau_chain = bounding_box;
-            }
+            // if (event_count.size() < 1) {
+            //     tau_chain = bounding_box*(particles.size() + 1)/4.0;
+            // }
+            // else {
+            //     tau_chain = bounding_box;
+            // }
 
             while (tau_chain > 0) {
                 std::exponential_distribution<> dist_ff(1.0/particles[k].h_i);
@@ -452,7 +455,7 @@ class Simulation {
                     particles[k].pos[0] = fmod(particles[k].pos[0], bounding_box);
 
                     particles[k].v = 0;
-                    particles[k].h_i = mean;
+                    // particles[k].h_i = mean;
                     k = lifted_particle;
                     particles[k].v = 1;
                 }
@@ -493,18 +496,27 @@ class Simulation {
             std::uniform_int_distribution<> distribution(0, 20);
 
             calculate_var_u();
+            calculate_structure_factor();
+            event_count.push_back(0);
+
             auto t1 = std::chrono::high_resolution_clock::now();
 
-            // for (Particle particle : particles) {
-            //     std::cout << particle.radius << std::endl;
-            // }
             while (count < trials) {
                 // sampling_method(particles=particle_list);
 
                 event_chain_ff_sequence_acc();
                 count += 1;
 
-                if (count % 100000 == 0) {
+                // RESET H_I to optimal procedure
+                //if (count == (particles.size()*bounding_box/4)/bounding_box)
+                if (count == 1){
+                        for (Particle &particle : particles) {
+                                particle.h_i = mean;
+                        }
+                }
+
+
+                if (count % 50000 == 0) {
                     std::cout << count << std::endl;
 
                     auto t2 = std::chrono::high_resolution_clock::now();
@@ -532,7 +544,7 @@ class Simulation {
 };
 
 int main(int argc, char *argv[]) {
-    int N_TRIALS = 100000;
+    int N_TRIALS = 50000;
     int N_PARTICLES = std::stoi(argv[1]);
     double DIAMETER = 400.0/(2*N_PARTICLES);
     std::cout << DIAMETER << " " << DIAMETER/2 << std::endl;

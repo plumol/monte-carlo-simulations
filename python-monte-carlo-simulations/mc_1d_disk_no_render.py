@@ -24,7 +24,7 @@ class Particle():
 
         self.theta = np.random.uniform(0, 2 * np.pi)
         self.v = 0.0
-        self.delta = 10
+        self.delta = 75
         self.h_i = h_i
 
         # this line is supposed to be an initial movement, but it doesn't actually move until you press R
@@ -75,6 +75,8 @@ class Simulation():
         self.events = []
         self.var_mix = []
         self.moves = []
+        self.dis = np.array([0 for i in range(n_particles)])
+        self.random_dis = []
 
         self.dt = 0
         self.running = True
@@ -180,6 +182,16 @@ class Simulation():
             w.append(w_i)
         
         self.var_mix.append(np.var(w))
+
+    def random_his(self):
+        for i in range(len(self.particle_list)):
+            next_idx = (i+1)%len(self.particle_list)
+
+            di = self.particle_list[next_idx].pos[0] - self.particle_list[i].pos[0] - (2*self.particle_list[0].radius)
+            if self.particle_list[next_idx].pos[0] < self.particle_list[i].pos[0]:
+                di += self.rect_value
+            
+            self.dis[i] = di
 
     def save_structure_factors(self, file_name):
         df = pd.DataFrame(zip(self.structure_factors, self.events, self.var_mix), columns=["sf", "events", "var_mix"])
@@ -420,9 +432,14 @@ class Simulation():
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
+        self.random_his()
+        random_hi = np.sqrt(np.abs(np.mean(self.dis)**2 - np.mean(self.dis**2)))
+        self.random_dis.append(random_hi)
+
         while tau_chain > 0:
             #x_ff = np.random.exponential(self.mean)
-            x_ff = np.random.exponential(particles[k].h_i)
+            #x_ff = np.random.exponential(particles[k].h_i)
+            x_ff = np.random.exponential(random_hi)
             # print(particles[k].h_i)
             # print([particle.h_i for particle in particles])
             
@@ -450,14 +467,6 @@ class Simulation():
             # x_ff = np.random.exponential(middx)
             # calculate distance with (i, i-1)
             
-            
-            # try:
-            #     h = max(dx-particles[k].radius*2, self.mean)
-            #     #print(h)
-            #     x_ff = np.random.exponential(dx)
-            # except:
-            #     print("EXP BROKE", dx)
-
             colliding_times = dx/particles[k].v
             #print(colliding_times)
             # TODO: solve for x_ff_t
@@ -546,6 +555,7 @@ class Simulation():
         self.mixing_times2()
         self.structure_factor()
         self.events.append(0)
+        self.random_his()
         while count <= self.trials:
             
             # TODO: given n particles, choose one at random
@@ -607,10 +617,14 @@ DIAMETER = SYSTEM_LENGTH/(2*N_PARTICLES)
 var_equil = (400-N_PARTICLES*DIAMETER)**2/(4*(N_PARTICLES+1))
 
 # markov = Simulation("markov", N_TRIALS, SYSTEM_LENGTH, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
-# m_x_pos, m_y_pos = markov.simulate()
+# m_x_pos, m_y_pos, mixed_time = markov.simulate()
 
-# ecmc = Simulation("event", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
-# e_x_pos, e_y_pos = ecmc.simulate()
+# ecmc = Simulation("event", N_TRIALS/100, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+# e_x_pos, e_y_pos, mixed_time = ecmc.simulate()
+
+# ecmc_ff = Simulation("event_ff_acc", N_TRIALS/100, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+# e_ff_x_pos, e_ff_y_pos, mixed_time = ecmc_ff.simulate()
+
 
 # run loop
 ecmc_ff_var_mix = []
@@ -619,7 +633,7 @@ ecmc_ff_sf = []
 ecmc_ff_sf_means = []
 for i in range(0, 10):
     print(i)
-    ecmc_ff = Simulation("event", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
+    ecmc_ff = Simulation("event_ff_acc", N_TRIALS, 400, n_particles=N_PARTICLES, diameter=DIAMETER, spawning_protocol="uniform")
     e_ff_x_pos, e_ff_y_pos, mixed_time = ecmc_ff.simulate()
     ecmc_ff_var_mix.append(ecmc_ff.var_mix)
     ecmc_ff_events.append(ecmc_ff.events)
@@ -627,7 +641,7 @@ for i in range(0, 10):
     ecmc_ff_sf_means.append(np.mean(ecmc_ff.structure_factors))
 ecmc_ff_var_mix = np.mean(ecmc_ff_var_mix, axis=0)
 ecmc_ff_events = np.mean(ecmc_ff_events, axis=0)
-ecmc_ff_sf = np.mean(ecmc_ff_sf, axis=0)
+ecmc_ff_sf = ecmc_ff_sf
 
 # moves_df = pd.DataFrame(ecmc_ff.moves)
 # moves_df.to_csv("accelerated_first_chain.csv")
@@ -672,14 +686,16 @@ ecmc_ff_sf = np.mean(ecmc_ff_sf, axis=0)
 # x pos pdf
 # fig = plt.figure()
 
-# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="markov x")
+# plt.hist(np.array(m_x_pos), 40, density=True, histtype='step', label="metropolis")
 
-# plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc x")
+# plt.hist(np.array(e_x_pos), 40, density=True, histtype='step', label="ecmc")
 
-plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff x")
-plt.xlabel("x (active particle position)")
+# plt.hist(np.array(e_ff_x_pos), 40, density=True, histtype='step', label="ecmc ff")
 
-plt.show()
+# plt.xlabel("x (active particle position)")
+
+# plt.legend()
+# plt.show()
 
 #final configuration of particles
 # plt.scatter(np.array(m_x_pos[-N_PARTICLES:]), [0 for i in range(N_PARTICLES)], 10, alpha=0.3, label="markov x")
@@ -693,8 +709,8 @@ plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +3):N_PARTICLES*(step+4)]), [0
 plt.scatter(np.array(e_ff_x_pos[N_PARTICLES*(step +4):N_PARTICLES*(step+5)]), [0.704 for i in range(N_PARTICLES)], DIAMETER, alpha=0.3, label="ecmc ff x")
 
 
-plt.xlim(0, 400)
-# plt.legend()
+# plt.xlim(0, 400)
+plt.legend()
 plt.show()
 
 eff_base_df = pd.read_csv("ecmc_ff_16_c-4.csv")
@@ -708,12 +724,19 @@ eff_base_sf = np.array(eff_base_df['sf'].to_list())
 # fig = plt.figure()
 # plt.plot([1 * i for i in range(len(markov.structure_factors))], np.array(markov.structure_factors), label="markov" )
 # plt.plot([10000 * i for i in range(len(ecmc.structure_factors))], np.array(ecmc.structure_factors, dtype=complex), label="ecmc")
-plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
-# plt.hist(np.array(ecmc_ff.structure_factors), 40, histtype='step', label="test")
+# plt.plot([10000 * i for i in range(len(ecmc_ff.structure_factors))], np.array(ecmc_ff.structure_factors, dtype=complex), label="ecmc ff")
+# plt.hist(np.array(ecmc_ff.structure_factors), 40, histtype='step', label="test", density=True)
 # plt.hist(np.array(eff_base_sf), 40, histtype='step', label="base")
-plt.xlabel("Strucure Factor")
 
-print("mean SF", np.mean(ecmc_ff.structure_factors), "var SF", np.std(ecmc_ff_sf_means), "mean EVENTS", np.mean(ecmc_ff.events), ecmc_ff_events[0:6])
+# plt.hist(np.array(markov.structure_factors), 40, histtype='step', density=True, label='metropolis')
+# plt.hist(np.array(ecmc.structure_factors), 40, histtype='step', density=True, label='ecmc')
+plt.hist(np.array(ecmc_ff.structure_factors), 40, histtype='step', density=True, label='ecmc ff')
+
+# for sfs in ecmc_ff_sf:
+#     plt.hist(np.array(sfs), 40, histtype='step', density=True)
+# plt.xlabel("Strucure Factor")
+
+# print("mean SF", np.mean(ecmc_ff.structure_factors), "var SF", np.std(ecmc_ff_sf_means), "mean EVENTS", np.mean(ecmc_ff.events), ecmc_ff_events[0:6])
 
 # after loading SF!
 # plt.hist(np.array(markov_sf, dtype=complex), 100, histtype='step', label="markov", density=True, cumulative=True)
@@ -741,11 +764,16 @@ plt.legend()
 
 plt.show()
 
+plt.plot(ecmc_ff.random_dis)
+plt.hlines(ecmc_ff.mean, 0, N_TRIALS, colors="black")
+print("MEAN RANDOM HIS", np.mean(ecmc_ff.random_dis))
+plt.show()
+
 
 
 # mixing times
-# eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
-# eff_x_base = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(eff_base_events)/16
+eff_x = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(ecmc_ff.events)/N_PARTICLES
+eff_x_base = np.linspace(0, N_TRIALS, N_TRIALS)*np.mean(eff_base_events)/16
 eff_x = np.cumsum(ecmc_ff_events)/N_PARTICLES
 eff_x_base = np.cumsum(eff_base_events)/16
 
