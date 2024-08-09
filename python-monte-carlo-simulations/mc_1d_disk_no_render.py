@@ -83,6 +83,9 @@ class Simulation():
         self.trials = n_trials
         self.sm = sampling_method
         self.mean = (bounding_box_size - n_particles*diameter)/n_particles
+
+        self.current_reset_time = 0
+        self.reset_time = 0
         
 
         if sampling_method == "direct":
@@ -192,6 +195,11 @@ class Simulation():
                 di += self.rect_value
             
             self.dis[i] = di
+
+        random_hi = np.sqrt(np.abs(np.mean(self.dis)**2 - np.mean(self.dis**2)))
+        self.random_dis.append(random_hi)
+
+        return random_hi
 
     def save_structure_factors(self, file_name):
         df = pd.DataFrame(zip(self.structure_factors, self.events, self.var_mix), columns=["sf", "events", "var_mix"])
@@ -432,14 +440,11 @@ class Simulation():
         # P_T = len(particles)/(self.rect_value.width - len(particles)*particles[k].radius*2)
         #print(P_T)
         
-        self.random_his()
-        random_hi = np.sqrt(np.abs(np.mean(self.dis)**2 - np.mean(self.dis**2)))
-        self.random_dis.append(random_hi)
-
+        # random_hi = self.random_dis[-1]
         while tau_chain > 0:
             #x_ff = np.random.exponential(self.mean)
             #x_ff = np.random.exponential(particles[k].h_i)
-            x_ff = np.random.exponential(random_hi)
+            x_ff = np.random.exponential(self.random_dis[-1])
             # print(particles[k].h_i)
             # print([particle.h_i for particle in particles])
             
@@ -480,10 +485,8 @@ class Simulation():
                 lifted_particle = prev_idx
                 # particles[lifted_particle].h_i = 0.9 * particles[k].h_i
                 # particles[k].h_i = self.mean
-                a = "FF"
             else:
                 lifted_particle = next_idx
-                a = "COLLISION"
             
             #print(f"collide {a}", colliding_times, (k, lifted_particle), tau_chain, particles[k].pos[0], particles[k].pos[0] + colliding_times)
 
@@ -506,6 +509,12 @@ class Simulation():
                 #particles[k].h_i = self.mean
                 k = lifted_particle
                 particles[k].v = v
+
+                self.current_reset_time += colliding_times
+                if self.current_reset_time >= self.reset_time:
+                    self.random_his()
+                    self.current_reset_time = 0
+                    self.reset_time = len(self.particle_list) * self.random_dis[-1]
             else:
                 # move to x + v * tau_chain
                 pdx = particles[k].v * tau_chain
@@ -516,6 +525,13 @@ class Simulation():
                     if side == 1:
                         particles[k].move(-self.rect_value , 0)
                         pdx += -self.rect_value 
+
+                self.current_reset_time += tau_chain
+                if self.current_reset_time >= self.reset_time:
+                    self.random_his()
+                    self.current_reset_time = 0
+                    self.reset_time = len(self.particle_list) * self.random_dis[-1]
+
             
             events += 1
             tau_chain -= colliding_times
@@ -555,7 +571,8 @@ class Simulation():
         self.mixing_times2()
         self.structure_factor()
         self.events.append(0)
-        self.random_his()
+        self.reset_time = len(self.particle_list) * self.random_his()
+
         while count <= self.trials:
             
             # TODO: given n particles, choose one at random

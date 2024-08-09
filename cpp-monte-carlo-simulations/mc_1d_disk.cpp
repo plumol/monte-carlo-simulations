@@ -83,6 +83,9 @@ class Simulation {
         int n_particles;
         int diameter;
         bool OPTIMAL_PHASE;
+
+        double current_reset_time;
+        double reset_time;
         
         std::vector<double> structure_factors;
         std::vector<double> x_pos;
@@ -99,6 +102,9 @@ class Simulation {
             this->n_particles = n_particles;
             this->diameter = diameter;
             this-> OPTIMAL_PHASE = false;
+
+            this->current_reset_time = 0;
+            this->reset_time = 0;
 
             event_count.reserve(trials);
             x_pos.reserve(trials * particles.size());
@@ -458,16 +464,16 @@ class Simulation {
             //     tau_chain = bounding_box;
             // }
             double hi;
-            if (OPTIMAL_PHASE) {
-                hi = mean;
-            }
-            else {
-                hi = calculate_random_hi();
-            }
+            // if (OPTIMAL_PHASE) {
+            //     hi = mean;
+            // }
+            // else {
+            //     hi = calculate_random_hi();
+            // }
             
             while (tau_chain > 0) {
                 //std::exponential_distribution<> dist_ff(1.0/particles[k].h_i);
-                std::exponential_distribution<> dist_ff(1.0/hi);
+                std::exponential_distribution<> dist_ff(1.0/random_his.back());
                 double x_ff = dist_ff(generator);
 
                 int next_idx = (k+1)%particles.size();
@@ -506,10 +512,24 @@ class Simulation {
                     // particles[k].h_i = mean;
                     k = lifted_particle;
                     particles[k].v = 1;
+
+                    current_reset_time += colliding_times;
+                    if (current_reset_time > reset_time) {
+                        calculate_random_hi();
+                        current_reset_time = 0;
+                        reset_time = n_particles * random_his.back();
+                    }
                 }
                 else {
                     particles[k].move(particles[k].v * tau_chain);
                     particles[k].pos[0] = fmod(particles[k].pos[0], bounding_box);
+
+                    current_reset_time += tau_chain;
+                    if (current_reset_time > reset_time) {
+                        calculate_random_hi();
+                        current_reset_time = 0;
+                        reset_time = n_particles * random_his.back();
+                    }
                 }
 
                 events += 1;
@@ -546,7 +566,7 @@ class Simulation {
             calculate_var_u();
             calculate_structure_factor();
             event_count.push_back(0);
-            calculate_random_hi();
+            reset_time = n_particles * calculate_random_hi();
 
             auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -600,13 +620,13 @@ int main(int argc, char *argv[]) {
     std::cout << DIAMETER << " " << DIAMETER/2 << std::endl;
     std::cout << argv[1] << std::endl;
     
-    // arg1 = n particles, arg2 = iteration
+    // arg1 = n particles, arg2 = iteration, arg3 = file name
     std::string arg1(argv[1]);
     std::string arg2(argv[2]);
 
     Simulation markov("markov", N_TRIALS, 400, N_PARTICLES, DIAMETER, "uniform");
     markov.simulate();
     // markov.save_positions("ecmc_sf_10m-100.csv");
-    markov.save_structure_factors("var_runs/" + arg1 + "/ecmc_ff_sf_10m-" + arg1+ "-" + arg2 + ".csv");
+    markov.save_structure_factors(argv[3] + arg1 + "/ecmc_ff_sf_10m-" + arg1+ "-" + arg2 + ".csv");
 
 }
